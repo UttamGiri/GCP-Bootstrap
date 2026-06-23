@@ -1,0 +1,27 @@
+project_id       = "bootstrap-prj"
+create_project   = true
+org_id           = "123456789012"
+# folder_id      = "123456789012" # Use instead of org_id, not both
+billing_account  = "000000-000000-000000"
+tfe_workspace_id = "ws-xxxxxxxxxxxxxxxx"
+create_state_bucket = true
+# foundation_state_bucket_name = "bootstrap-prj-tfstate"
+
+# Optional overrides
+# project_name                           = "Bootstrap Project"
+# bootstrap_service_account_name         = "bs-tfe-sa"
+# bootstrap_service_account_display_name = "Bootstrap Terraform Enterprise Service Account"
+# oidc_issuer_uri                        = "https://app.terraform.io"
+# workload_identity_pool_id              = "tfe-pool"
+# workload_identity_provider_id          = "tfe-provider"
+# project_labels = {
+#   environment = "bootstrap"
+#   owner       = "platform"
+# }
+# bootstrap_roles = [
+#   "roles/viewer",
+#   "roles/storage.admin",
+#   "roles/resourcemanager.projectIamAdmin",
+#   "roles/iam.serviceAccountAdmin",
+#   "roles/iam.serviceAccountTokenCreator"
+# ]

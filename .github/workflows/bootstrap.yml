@@ -2,46 +2,54 @@ name: Terraform Bootstrap
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "terraform/**"
-      - ".github/workflows/bootstrap.yml"
+    inputs:
+      stack:
+        description: "Terraform stack to run"
+        required: true
+        type: choice
+        options:
+          - foundation
+          - automation
+        default: automation
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  terraform-bootstrap:
+  terraform-workspace-run:
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: true
-      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
-      TF_VAR_github_repository: ${{ github.repository }}
-      TF_VAR_github_branch: ${{ github.ref_name }}
+      TF_CLOUD_ORGANIZATION: ${{ vars.TF_CLOUD_ORGANIZATION }}
+      TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+      TF_STACK: ${{ inputs.stack }}
+      TF_WORKSPACE: ${{ inputs.stack == 'foundation' && vars.TF_WORKSPACE_FOUNDATION || vars.TF_WORKSPACE_AUTOMATION }}
+      TF_DIRECTORY: ${{ inputs.stack == 'foundation' && './terraform/foundation' || './terraform/automation' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud via OIDC
-        uses: google-github-actions/auth@v2
+      - name: Upload Terraform Configuration
+        id: upload
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.3.2
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_BOOTSTRAP_SERVICE_ACCOUNT }}
+          hostname: ${{ vars.TF_HOSTNAME }}
+          workspace: ${{ env.TF_WORKSPACE }}
+          directory: ${{ env.TF_DIRECTORY }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Create Terraform Run
+        id: create-run
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.3.2
+        with:
+          hostname: ${{ vars.TF_HOSTNAME }}
+          workspace: ${{ env.TF_WORKSPACE }}
+          configuration_version: ${{ steps.upload.outputs.configuration_version_id }}
+          message: ${{ format('Bootstrap {0} run from GitHub Actions', env.TF_STACK) }}
 
-      - name: Terraform Init
-        working-directory: terraform
-        run: terraform init
-
-      - name: Terraform Workspace
-        working-directory: terraform
-        run: terraform workspace new bootstrap || terraform workspace select bootstrap
-
-      - name: Terraform Apply
-        working-directory: terraform
-        run: terraform apply -auto-approve
+      - name: Apply Terraform Run
+        id: apply-run
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.3.2
+        with:
+          hostname: ${{ vars.TF_HOSTNAME }}
+          run: ${{ steps.create-run.outputs.run_id }}
+          comment: "Apply confirmed from GitHub Actions"

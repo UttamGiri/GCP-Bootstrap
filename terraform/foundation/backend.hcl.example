@@ -1,0 +1,2 @@
+bucket = "your-bootstrap-tfstate-bucket"
+prefix = "gcp-bootstrap/foundation"
