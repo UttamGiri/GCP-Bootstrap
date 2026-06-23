@@ -5,4 +5,7 @@
 *.tfstate.*
 crash.log
 *.tfvars
-!terraform/terraform.tfvars.example
+backend.hcl
+!terraform/foundation/terraform.tfvars.example
+!terraform/automation/terraform.tfvars.example
+!terraform/foundation/backend.hcl.example

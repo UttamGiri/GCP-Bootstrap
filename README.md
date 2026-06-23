@@ -1,98 +1,152 @@
-# GCP Bootstrap (Terraform Only)
+# GCP Bootstrap (Foundation + Automation)
 
-This repo solves the GCP chicken-egg bootstrap problem using Terraform only.
-It creates:
+This repo keeps one codebase but splits execution into two Terraform stacks:
 
-- `bs-tfe-sa` service account
-- initial project IAM roles for that service account
-- Workload Identity Pool + Provider for GitHub OIDC
-- IAM binding so GitHub repo can impersonate `bs-tfe-sa`
+- `terraform/foundation`: one-time bootstrap of `bootstrap-prj`, `bs-tfe-sa`, and WIF pool/provider for Terraform workspace OIDC
+- `terraform/automation`: ongoing updates to IAM roles of the same `bs-tfe-sa`
 
-## Why this design
+This matches your model where state and apply happen inside TFE/TFC workspace, not on GitHub runner.
 
-You can:
+## Stack 1: Foundation (Path 1)
 
-- zip this repo, extract on any machine, and run `terraform apply`
-- push to GitHub and run bootstrap from GitHub Actions with OIDC
-- call this repo from another Terraform workspace (for example `gcp-tf-bootstrap`) using Git source
-- let the same bootstrap identity update its own project roles when needed
+Use this first to bootstrap trust and identity.
 
-## Prerequisites
+Creates:
 
-- Terraform `>= 1.5.0`
-- Google Cloud authentication on first run (local user credentials)
-- Permissions in target project to create:
-  - service accounts
-  - project IAM bindings
-  - workload identity pools/providers
+- bootstrap project (optional, enabled by default with `create_project=true`)
+- bootstrap service account `bs-tfe-sa`
+- initial bootstrap project roles
+- Workload Identity Pool + Provider for Terraform workspace OIDC
+- IAM impersonation binding for the exact Terraform workspace ID
 
-## 1) Run from zip/extract + CLI
+Required foundation inputs:
 
-Create zip:
+- `tfe_workspace_id` (example `ws-xxxxxxxxxxxxxxxx`)
+- `project_id`
+- if `create_project=true`:
+  - one of `org_id` or `folder_id`
+  - `billing_account`
+
+### Foundation state backend (object storage)
+
+Foundation uses object storage state in Google Cloud Storage (GCS), not TFE workspace state.
+
+If you meant "S3 bucket", in GCP the equivalent is a GCS bucket.
+
+### Create state bucket manually (recommended first run)
+
+#### Option A: Google Cloud Console
+
+1. Open Cloud Storage in an existing project you can use for Terraform state.
+2. Create bucket (globally unique name), for example `bootstrap-prj-tfstate`.
+3. Choose region/location per your policy.
+4. Enable bucket versioning.
+5. Keep access private (uniform bucket-level access recommended).
+
+#### Option B: gcloud / gsutil CLI
 
 ```bash
-cd GCP-Booptstrap
-zip -r gcp-bootstrap.zip . -x "*.git*"
+gcloud storage buckets create gs://bootstrap-prj-tfstate --project=<STATE_HOST_PROJECT_ID> --location=us-central1
+gcloud storage buckets update gs://bootstrap-prj-tfstate --versioning
 ```
 
-Extract and apply:
+### How foundation code uses this bucket
+
+- Backend block is in `terraform/foundation/backend.tf`
+- Backend settings are passed from `terraform/foundation/backend.hcl`
+
+Create local backend config:
 
 ```bash
-unzip gcp-bootstrap.zip -d gcp-bootstrap
-cd gcp-bootstrap/terraform
+cd terraform/foundation
+cp backend.hcl.example backend.hcl
+# edit backend.hcl bucket/prefix values
+```
+
+Then initialize with backend config:
+
+```bash
+terraform init -backend-config=backend.hcl
+```
+
+Example foundation local run:
+
+```bash
+cd terraform/foundation
 cp terraform.tfvars.example terraform.tfvars
-```
-
-Update `terraform.tfvars`:
-
-```hcl
-project_id        = "your-gcp-project-id"
-github_repository = "UttamGiri/GCP-Bootstrap"
-github_branch     = "main"
-```
-
-Then run:
-
-```bash
-terraform init
-terraform workspace new bootstrap || terraform workspace select bootstrap
+cp backend.hcl.example backend.hcl
+# update terraform.tfvars and backend.hcl
+terraform init -backend-config=backend.hcl
+terraform plan
 terraform apply
 ```
 
-## 2) Push to GitHub and run with OIDC
+Best practice:
 
-This repo includes workflow: `.github/workflows/bootstrap.yml`.
+- Keep foundation state in remote object storage (GCS).
+- Enable versioning on the state bucket.
+- Never commit state files to Git.
+- Use least-privilege access for bucket and state operations.
+- Host state bucket in an existing central/state-host project.
 
-After first local bootstrap apply, set these GitHub repository variables:
+### No TFE Auth Local Flow (project not pre-created)
 
-- `GCP_PROJECT_ID` = your project id
-- `GCP_WORKLOAD_IDENTITY_PROVIDER` = output `github_workload_identity_provider`
-- `GCP_BOOTSTRAP_SERVICE_ACCOUNT` = output `bootstrap_service_account_email`
+If you cannot authenticate to TFE from local and do not want to pre-create the project:
 
-Then trigger GitHub Actions workflow `Terraform Bootstrap` (manual or push to `main`).
+1. Run foundation once with local state (`create_project=true`, `create_state_bucket=true`).
+2. Let foundation create the bootstrap project and state bucket.
+3. Configure `backend.hcl` with that bucket.
+4. Run `terraform init -migrate-state -backend-config=backend.hcl`.
 
-## 3) Use from `gcp-tf-bootstrap` workspace via GitHub repo
+This gives a safe bootstrap path with no state in Git and no manual project pre-creation.
 
-In another workspace, call this repo as a module:
+## Stack 2: Automation (Path 2)
 
-```hcl
-module "gcp_bootstrap" {
-  source = "git::https://github.com/UttamGiri/GCP-Bootstrap.git//terraform?ref=main"
+Use this after foundation for day-2 role updates to the same service account.
 
-  project_id        = var.project_id
-  github_repository = "UttamGiri/GCP-Bootstrap"
-  github_branch     = "main"
-}
+Manages:
+
+- role membership for `bs-tfe-sa@<project>.iam.gserviceaccount.com`
+
+Example local run:
+
+```bash
+cd terraform/automation
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform apply
 ```
 
-This lets `gcp-tf-bootstrap` consume the same bootstrap logic directly from GitHub.
+## GitHub Action -> Terraform Workspace Run
 
-## Default bootstrap roles
+Workflow file: `.github/workflows/bootstrap.yml`
 
-- `roles/viewer`
-- `roles/storage.admin`
-- `roles/resourcemanager.projectIamAdmin`
-- `roles/iam.serviceAccountAdmin`
-- `roles/iam.serviceAccountTokenCreator`
+This workflow:
 
-Tune `bootstrap_roles` in `terraform/variables.tf` for least privilege.
+- uploads selected stack configuration
+- creates run in TFE/TFC workspace
+- applies run via TFE/TFC API
+
+It does not execute Terraform on GitHub runner.  
+State and apply happen in the Terraform workspace backend.
+
+GitHub repo configuration:
+
+- Variables:
+  - `TF_CLOUD_ORGANIZATION`
+  - `TF_WORKSPACE_FOUNDATION`
+  - `TF_WORKSPACE_AUTOMATION`
+  - `TF_HOSTNAME` (optional, only for Terraform Enterprise)
+- Secret:
+  - `TF_API_TOKEN`
+
+How to run:
+
+- trigger workflow `Terraform Bootstrap`
+- choose input `stack = foundation` or `stack = automation`
+
+## Recommended controls
+
+- Keep manual apply approvals in both workspaces
+- Restrict approvers for foundation workspace
+- Keep at least one break-glass admin principal outside `bs-tfe-sa`

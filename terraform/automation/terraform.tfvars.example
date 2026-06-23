@@ -1,0 +1,11 @@
+project_id = "bootstrap-prj"
+
+# Optional overrides
+# bootstrap_service_account_name = "bs-tfe-sa"
+# bootstrap_roles = [
+#   "roles/viewer",
+#   "roles/storage.admin",
+#   "roles/resourcemanager.projectIamAdmin",
+#   "roles/iam.serviceAccountAdmin",
+#   "roles/iam.serviceAccountTokenCreator"
+# ]
