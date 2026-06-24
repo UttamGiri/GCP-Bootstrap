@@ -5,7 +5,7 @@ flowchart TD
     A[Bootstrap repo zip or git source]
     A --> B[Open Google Cloud Shell]
     B --> C[unzip/clone repo]
-    C --> D[cd terraform and set terraform.tfvars]
+    C --> D[cd terraform and set environment tfvars]
     D --> E[terraform init plan apply with local state]
 
     E --> P[Create bootstrap project under org/folder]
@@ -31,11 +31,13 @@ flowchart TD
 2. Run unified stack from Cloud Shell using local state:
    - `unzip gcp-bootstrap.zip -d gcp-bootstrap`
    - `cd gcp-bootstrap/terraform`
-   - `cp terraform.tfvars.example terraform.tfvars`
-   - edit required values (`project_id`, `org_id`/`folder_id`, `billing_account`, `tfe_workspace_id`)
-   - `terraform init && terraform plan && terraform apply`
+   - `cp environments/dev.tfvars.example environments/dev.tfvars`
+   - edit required values (`project_id`, `create_project`, `tfe_workspace_id`, and optional org/folder/billing values)
+   - `/usr/bin/terraform init`
+   - `/usr/bin/terraform plan -var-file="environments/dev.tfvars"`
+   - `/usr/bin/terraform apply -var-file="environments/dev.tfvars"`
 3. Export local state:
-   - `terraform state pull > terraform.tfstate`
+   - `/usr/bin/terraform state pull > terraform.tfstate`
 4. Download `terraform.tfstate` to your PC.
 5. In TFE workspace UI, upload this state file (State Versions -> Upload).
 6. Configure workspace variables:
