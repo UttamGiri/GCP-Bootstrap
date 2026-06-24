@@ -1,152 +1,278 @@
-# GCP Bootstrap (Foundation + Automation)
+# GCP Bootstrap (Unified Stack)
 
-This repo keeps one codebase but splits execution into two Terraform stacks:
+This repository uses one Terraform stack in `terraform/` that handles:
 
-- `terraform/foundation`: one-time bootstrap of `bootstrap-prj`, `bs-tfe-sa`, and WIF pool/provider for Terraform workspace OIDC
-- `terraform/automation`: ongoing updates to IAM roles of the same `bs-tfe-sa`
-
-This matches your model where state and apply happen inside TFE/TFC workspace, not on GitHub runner.
-
-## Stack 1: Foundation (Path 1)
-
-Use this first to bootstrap trust and identity.
-
-Creates:
-
-- bootstrap project (optional, enabled by default with `create_project=true`)
+- bootstrap project usage (existing project mode by default)
 - bootstrap service account `bs-tfe-sa`
-- initial bootstrap project roles
+- required project API enablement
 - Workload Identity Pool + Provider for Terraform workspace OIDC
-- IAM impersonation binding for the exact Terraform workspace ID
+- IAM roles for the bootstrap service account
+- impersonation binding for a specific Terraform workspace ID
 
-Required foundation inputs:
+## Intended operating model
 
-- `tfe_workspace_id` (example `ws-xxxxxxxxxxxxxxxx`)
+1. Run Terraform first from Google Cloud Shell with local state.
+2. Download the generated local state file.
+3. Import that state into a Terraform Cloud/Enterprise workspace.
+4. Configure workspace variables (including GCP OIDC env vars).
+5. Run future updates from Terraform workspace UI.
+
+## Prerequisites
+
+- Access to Google Cloud Shell (or any environment with working gcloud auth)
+- Terraform installed in the execution environment
+- Permissions to create projects under your org/folder and attach billing
+- Terraform Cloud/Enterprise access to create projects/workspaces
+
+## Install Terraform in Cloud Shell (if missing)
+
+Check first:
+
+```bash
+terraform version
+```
+
+If command is missing, install Terraform:
+
+```bash
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install -y terraform
+terraform version
+```
+
+If install succeeds but `terraform` is still not found, use the full path:
+
+```bash
+/usr/bin/terraform version
+/usr/bin/terraform init
+```
+
+Why this happens:
+
+- package install placed Terraform at `/usr/bin/terraform`
+- current shell PATH/hash cache may not have refreshed yet
+- using full path bypasses PATH lookup issues
+
+Optional persistence for future Cloud Shell sessions:
+
+- Add the install commands above to `$HOME/.customize_environment`.
+
+Also verify Google auth in Cloud Shell:
+
+```bash
+gcloud auth list
+gcloud auth application-default print-access-token
+```
+
+Cloud Shell cleanup (delete cloned/unzipped repo folder):
+
+```bash
+ls ~/GCP-Booptstrap
+rm -rf ~/GCP-Booptstrap
+```
+
+## Terraform workspace creation (recommended)
+
+1. In TFE/TFC, create a **Project** named `platform-bootstrap`.
+2. Inside that project, create a new workspace.
+3. Choose **Version Control Workflow**.
+4. Connect this GitHub repository.
+5. Set workspace **Working Directory** to `terraform/`.
+6. Save workspace and copy the workspace ID (`ws-xxxxxxxxxxxxxxxx`) from workspace settings/details.
+
+Notes:
+
+- Use Version Control Workflow for traceability and UI approvals.
+- CLI-Driven and API-Driven workflows are not the primary mode for this setup.
+
+## Cloud Shell first run (local state)
+
+Backend note:
+
+- There is no explicit backend block in `terraform/main.tf`.
+- Terraform therefore uses the default local backend (`terraform.tfstate` in working directory).
+- Local backend is used by omission until you move/import state to TFE workspace.
+
+If you need to create the zip package first (from repo root):
+
+```bash
+zip -r gcp-bootstrap.zip . -x ".git/*" -x ".DS_Store"
+```
+
+```bash
+unzip gcp-bootstrap.zip -d gcp-bootstrap
+cd gcp-bootstrap/terraform
+# create terraform.tfvars manually (see required values below)
+```
+
+Edit `terraform.tfvars` with your values:
+
 - `project_id`
-- if `create_project=true`:
-  - one of `org_id` or `folder_id`
-  - `billing_account`
+- `create_project=false` (default; use existing project)
+- `create_project=true` only when you want Terraform to create project
+- if `create_project=true`: prefer `folder_id`; use `org_id` only as fallback, and set `billing_account`
+- `tfe_workspace_id`
 
-### Foundation state backend (object storage)
+Note: this repo expects key runtime settings to come from `terraform.tfvars` / workspace variables (not hidden defaults).
 
-Foundation uses object storage state in Google Cloud Storage (GCS), not TFE workspace state.
+Personal account note:
 
-If you meant "S3 bucket", in GCP the equivalent is a GCS bucket.
+- If you do not have a Google Organization, create a project manually in Console and keep `create_project=false`.
+- If you have an Organization and later switch to `create_project=true`, you can set `org_id = "2336890507"` (or use `folder_id`).
 
-### Create state bucket manually (recommended first run)
-
-#### Option A: Google Cloud Console
-
-1. Open Cloud Storage in an existing project you can use for Terraform state.
-2. Create bucket (globally unique name), for example `bootstrap-prj-tfstate`.
-3. Choose region/location per your policy.
-4. Enable bucket versioning.
-5. Keep access private (uniform bucket-level access recommended).
-
-#### Option B: gcloud / gsutil CLI
+Then run:
 
 ```bash
-gcloud storage buckets create gs://bootstrap-prj-tfstate --project=<STATE_HOST_PROJECT_ID> --location=us-central1
-gcloud storage buckets update gs://bootstrap-prj-tfstate --versioning
+/usr/bin/terraform init
+/usr/bin/terraform plan
+/usr/bin/terraform apply
 ```
 
-### How foundation code uses this bucket
+After this first run completes, continue with state import into the workspace created above.
 
-- Backend block is in `terraform/foundation/backend.tf`
-- Backend settings are passed from `terraform/foundation/backend.hcl`
+## Reuse same code for dev/prod
 
-Create local backend config:
+Use separate var files per environment:
+
+- `terraform/environments/dev.tfvars.example`
+- `terraform/environments/prod.tfvars.example`
+
+Create real files from examples (do not commit real tfvars):
 
 ```bash
-cd terraform/foundation
-cp backend.hcl.example backend.hcl
-# edit backend.hcl bucket/prefix values
+cd terraform
+cp environments/dev.tfvars.example environments/dev.tfvars
+cp environments/prod.tfvars.example environments/prod.tfvars
 ```
 
-Then initialize with backend config:
+Run with explicit env var file:
 
 ```bash
-terraform init -backend-config=backend.hcl
+/usr/bin/terraform init
+/usr/bin/terraform plan -var-file="environments/dev.tfvars"
+/usr/bin/terraform apply -var-file="environments/dev.tfvars"
 ```
 
-Example foundation local run:
+For prod:
 
 ```bash
-cd terraform/foundation
-cp terraform.tfvars.example terraform.tfvars
-cp backend.hcl.example backend.hcl
-# update terraform.tfvars and backend.hcl
-terraform init -backend-config=backend.hcl
-terraform plan
-terraform apply
+/usr/bin/terraform plan -var-file="environments/prod.tfvars"
+/usr/bin/terraform apply -var-file="environments/prod.tfvars"
 ```
 
-Best practice:
+## Download local state and import to Terraform workspace
 
-- Keep foundation state in remote object storage (GCS).
-- Enable versioning on the state bucket.
-- Never commit state files to Git.
-- Use least-privilege access for bucket and state operations.
-- Host state bucket in an existing central/state-host project.
-
-### No TFE Auth Local Flow (project not pre-created)
-
-If you cannot authenticate to TFE from local and do not want to pre-create the project:
-
-1. Run foundation once with local state (`create_project=true`, `create_state_bucket=true`).
-2. Let foundation create the bootstrap project and state bucket.
-3. Configure `backend.hcl` with that bucket.
-4. Run `terraform init -migrate-state -backend-config=backend.hcl`.
-
-This gives a safe bootstrap path with no state in Git and no manual project pre-creation.
-
-## Stack 2: Automation (Path 2)
-
-Use this after foundation for day-2 role updates to the same service account.
-
-Manages:
-
-- role membership for `bs-tfe-sa@<project>.iam.gserviceaccount.com`
-
-Example local run:
+From Cloud Shell (inside `terraform/`):
 
 ```bash
-cd terraform/automation
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform apply
+/usr/bin/terraform state pull > terraform.tfstate
 ```
 
-## GitHub Action -> Terraform Workspace Run
+Download `terraform.tfstate` to your PC (Cloud Shell file browser download is fine).
 
-Workflow file: `.github/workflows/bootstrap.yml`
+Then in Terraform Cloud/Enterprise workspace:
 
-This workflow:
+- Settings -> State Versions -> Upload
+- upload `terraform.tfstate`
 
-- uploads selected stack configuration
-- creates run in TFE/TFC workspace
-- applies run via TFE/TFC API
+After upload, set workspace working directory to `terraform/` (if using VCS repo integration).
 
-It does not execute Terraform on GitHub runner.  
-State and apply happen in the Terraform workspace backend.
+## After import: switch to TFE-managed runs only
 
-GitHub repo configuration:
+1. Confirm the uploaded state is visible in workspace state versions.
+2. Set all required Terraform + OIDC workspace variables.
+3. Run plan/apply from TFE workspace UI.
+4. Treat TFE workspace as the source of truth for state.
+5. Do not run local `terraform apply` anymore unless intentionally performing another state migration.
 
-- Variables:
-  - `TF_CLOUD_ORGANIZATION`
-  - `TF_WORKSPACE_FOUNDATION`
-  - `TF_WORKSPACE_AUTOMATION`
-  - `TF_HOSTNAME` (optional, only for Terraform Enterprise)
-- Secret:
-  - `TF_API_TOKEN`
+Optional hardening:
 
-How to run:
+- Restrict local write access to avoid accidental local applies.
+- Keep workspace auto-apply disabled and require manual approval.
 
-- trigger workflow `Terraform Bootstrap`
-- choose input `stack = foundation` or `stack = automation`
+## Workspace variables for ongoing runs
 
-## Recommended controls
+### Terraform variables (workspace)
 
-- Keep manual apply approvals in both workspaces
-- Restrict approvers for foundation workspace
-- Keep at least one break-glass admin principal outside `bs-tfe-sa`
+- `project_id`
+- `create_project` (typically `false` after first run)
+- `project_name` (optional)
+- `org_id` or `folder_id` (if still needed)
+- `billing_account` (if still needed)
+- `tfe_workspace_id`
+- optional overrides (`bootstrap_roles`, pool/provider IDs, labels)
+
+### Environment variables for GCP OIDC (workspace)
+
+- `TFC_GCP_PROVIDER_AUTH=true`
+- `TFC_GCP_PRINCIPAL_TYPE=service_account`
+- `TFC_GCP_WORKLOAD_PROVIDER_NAME=<output tfe_workload_identity_provider>`
+- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=<output bootstrap_service_account_email>`
+
+## Detailed OIDC variable mapping (copy/paste checklist)
+
+1. After first Cloud Shell apply, capture outputs:
+
+```bash
+cd terraform
+/usr/bin/terraform output -raw tfe_workload_identity_provider
+/usr/bin/terraform output -raw bootstrap_service_account_email
+/usr/bin/terraform output -raw bootstrap_project_id
+```
+
+2. In TFE/TFC workspace, set the following **Environment Variables**:
+
+- `TFC_GCP_PROVIDER_AUTH` = `true`
+- `TFC_GCP_PRINCIPAL_TYPE` = `service_account`
+- `TFC_GCP_WORKLOAD_PROVIDER_NAME` = value of `tfe_workload_identity_provider`
+- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL` = value of `bootstrap_service_account_email`
+
+3. Optional split identities (only if required by policy):
+
+- `TFC_GCP_PLAN_SERVICE_ACCOUNT_EMAIL` = SA email for plan
+- `TFC_GCP_APPLY_SERVICE_ACCOUNT_EMAIL` = SA email for apply
+
+4. Ensure Terraform variable `tfe_workspace_id` matches the exact workspace ID (`ws-...`) running this code.
+
+5. Keep workspace working directory set to `terraform/`.
+
+6. Trigger a plan from workspace UI and confirm OIDC auth works before apply.
+
+## Workspace settings (recommended)
+
+Configure these in TFE/TFC workspace settings:
+
+- Terraform working directory: `terraform/`
+- Auto-apply: `OFF` (manual approval recommended for bootstrap/IAM changes)
+- VCS trigger type: `Branch-based`
+- VCS branch: your active deployment branch (`main` or `develop`, based on your process)
+- Automatic run triggering: `Only trigger runs when files in specified paths change`
+- Trigger paths: `terraform/**`
+- Pull requests -> Automatic speculative plans: `ON`
+- Include submodules on clone: `OFF` (enable only if your repo actually uses git submodules)
+
+Why:
+
+- limits accidental applies
+- keeps runs focused on Terraform changes
+- provides PR plan visibility before merges
+
+## Workspace ownership and state source of truth
+
+- Use one TFE/TFC workspace for this unified stack.
+- After state upload/import, treat TFE workspace state as source of truth.
+- Do not continue local applies unless you intentionally migrate state again.
+
+## Ongoing updates from TFE/TFC UI
+
+Use regular UI-triggered runs (plan/apply) in the workspace to update:
+
+- project APIs in `required_services`
+- IAM roles in `bootstrap_roles`
+- WIF configuration and trust conditions
+
+## Destroy guidance
+
+If state is now in Terraform workspace, perform destroy from workspace UI.
+If state is still local, destroy from the same local directory/context used for apply.
