@@ -272,7 +272,55 @@ Use regular UI-triggered runs (plan/apply) in the workspace to update:
 - IAM roles in `bootstrap_roles`
 - WIF configuration and trust conditions
 
+## WIF pool/provider ID guidance
+
+- Do **not** change `workload_identity_pool_id` or `workload_identity_provider_id` on every run.
+- Keep these IDs stable for an environment (for example dev/prod) so Terraform can manage the same objects.
+- If Terraform says "already exists", it usually means resource exists in GCP but is missing in current state.
+  - Preferred fix: import existing resource into state.
+  - Use new ID only when you intentionally want a new pool/provider.
+
+Why you might intentionally create a new ID (for example `tfe-pool-dev-2` / `tfe-provider-dev-2`):
+
+- previous ID is stuck in deleted/tombstoned state and cannot be imported
+- previous object exists outside Terraform state and recovery/import is blocked
+- you need a fast recovery path to continue bootstrap without waiting on ID reuse lifecycle
+
 ## Destroy guidance
 
 If state is now in Terraform workspace, perform destroy from workspace UI.
 If state is still local, destroy from the same local directory/context used for apply.
+
+## Check state and destroy runbook
+
+From `terraform/`:
+
+```bash
+/usr/bin/terraform state list
+/usr/bin/terraform state list | wc -l
+```
+
+- If count is `0`, no resources are tracked in current state.
+- If count is greater than `0`, destroy will target those tracked resources.
+
+Optional: backup state before destroy:
+
+```bash
+/usr/bin/terraform state pull > terraform-state-backup.tfstate
+```
+
+Destroy local-state resources (dev example):
+
+```bash
+/usr/bin/terraform destroy -var-file="environments/dev.tfvars"
+```
+
+Verify state is empty after destroy:
+
+```bash
+/usr/bin/terraform state list | wc -l
+```
+
+For TFE-managed state:
+
+- Run destroy from TFE workspace UI (same workspace that owns the state).

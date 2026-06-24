@@ -9,9 +9,9 @@ project_name     = "Bootstrap Dev Project"
 bootstrap_service_account_name         = "bs-tfe-sa"
 bootstrap_service_account_display_name = "Bootstrap Terraform Enterprise Service Account"
 oidc_issuer_uri                        = "https://app.terraform.io"
-workload_identity_pool_id              = "tfe-pool-dev"
+workload_identity_pool_id              = "tfe-pool-dev-2"
 workload_identity_pool_display_name    = "TFE Pool Dev"
-workload_identity_provider_id          = "tfe-provider-dev"
+workload_identity_provider_id          = "tfe-provider-dev-2"
 workload_identity_provider_display_name = "TFE OIDC Provider Dev"
 
 project_labels = {
