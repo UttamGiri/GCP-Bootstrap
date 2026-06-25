@@ -62,6 +62,8 @@ oauth2/google: status code 400: {"error":"unauthorized_client","error_descriptio
 
 That means the `TFC_GCP_*` variables are present, but GCP rejected the workspace identity because its workspace ID is not allowed by the WIF provider condition.
 
+If bootstrap fails while updating the WIF provider with `iam.workloadIdentityPoolProviders.update denied`, the bootstrap service account needs `roles/iam.workloadIdentityPoolAdmin`. The environment roots include that role in `bootstrap_roles` so bootstrap can update its own WIF provider condition.
+
 ## Prerequisites
 
 - Access to Google Cloud Shell (or any environment with working gcloud auth)

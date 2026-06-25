@@ -53,6 +53,7 @@ module "bootstrap" {
     "roles/viewer",
     "roles/storage.admin",
     "roles/resourcemanager.projectIamAdmin",
+    "roles/iam.workloadIdentityPoolAdmin",
     "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountTokenCreator",
   ]
