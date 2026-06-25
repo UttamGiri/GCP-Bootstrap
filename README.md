@@ -1,6 +1,6 @@
 # GCP Bootstrap (Unified Stack)
 
-This repository uses one Terraform stack in `terraform-bootstrap/` that handles:
+This repository uses bootstrap Terraform environment roots under `terraform-bootstrap/envs/` that handle:
 
 - bootstrap project usage (existing project mode by default)
 - bootstrap service account `bs-tfe-sa`
@@ -23,7 +23,8 @@ It also includes separate TFE workspace configurations under `tfe-workspace/envs
 
 Use two separate TFE/TFC workspaces:
 
-- `bootstrap-dev`: runs `terraform-bootstrap/`
+- `bootstrap-dev`: runs `terraform-bootstrap/envs/dev`
+- `bootstrap-prod`: runs `terraform-bootstrap/envs/prod`
 - `tfe-dev`: runs `tfe-workspace/envs/dev`
 - `tfe-prod`: runs `tfe-workspace/envs/prod`
 
@@ -43,7 +44,23 @@ Important concept:
 - Resource existence is determined by the `tfe-dev` workspace state plus refresh against GCP.
 - This workspace keeps its own state. GCP authentication still comes from `TFC_GCP_*` environment variables set on the workspace before the run starts.
 
-Before running `tfe-dev`, the bootstrap WIF provider must trust the `tfe-dev` workspace ID. The bootstrap stack in `terraform-bootstrap/` is intentionally kept separate and should only be changed when you are ready to update bootstrap trust.
+Before running `tfe-dev`, the bootstrap WIF provider must trust the `tfe-dev` workspace ID. The bootstrap dev root in `terraform-bootstrap/envs/dev` is intentionally kept separate and should only be changed when you are ready to update bootstrap trust.
+
+For the current `GCP-tfe-workspace`, the dev bootstrap code includes this trusted workspace ID:
+
+```hcl
+additional_tfe_workspace_ids = [
+  "ws-2UNjJ7BXhV5ZnrAG"
+]
+```
+
+If `tfe-dev` is not trusted by bootstrap WIF, the run can plan successfully but fail during apply with:
+
+```text
+oauth2/google: status code 400: {"error":"unauthorized_client","error_description":"The given credential is rejected by the attribute condition."}
+```
+
+That means the `TFC_GCP_*` variables are present, but GCP rejected the workspace identity because its workspace ID is not allowed by the WIF provider condition.
 
 ## Prerequisites
 
@@ -106,7 +123,7 @@ rm -rf ~/GCP-Booptstrap
 2. Inside that project, create a new workspace.
 3. Choose **Version Control Workflow**.
 4. Connect this GitHub repository.
-5. Set workspace **Working Directory** to `terraform-bootstrap/`.
+5. Set workspace **Working Directory** to `terraform-bootstrap/envs/dev`.
 6. Save workspace and copy the workspace ID (`ws-xxxxxxxxxxxxxxxx`) from workspace settings/details.
 
 Notes:
@@ -118,7 +135,7 @@ Notes:
 
 Backend note:
 
-- There is no explicit backend block in `terraform-bootstrap/main.tf`.
+- There is no explicit backend block in `terraform-bootstrap/envs/dev/main.tf`.
 - Terraform therefore uses the default local backend (`terraform.tfstate` in working directory).
 - Local backend is used by omission until you move/import state to TFE workspace.
 
@@ -130,19 +147,10 @@ zip -r gcp-bootstrap.zip . -x ".git/*" -x ".DS_Store"
 
 ```bash
 unzip gcp-bootstrap.zip -d gcp-bootstrap
-cd gcp-bootstrap/terraform-bootstrap
-# create terraform.tfvars manually (see required values below)
+cd gcp-bootstrap/terraform-bootstrap/envs/dev
 ```
 
-Edit `terraform.tfvars` with your values:
-
-- `project_id`
-- `create_project=false` (default; use existing project)
-- `create_project=true` only when you want Terraform to create project
-- if `create_project=true`: prefer `folder_id`; use `org_id` only as fallback, and set `billing_account`
-- `tfe_workspace_id`
-
-Note: this repo expects key runtime settings to come from `terraform.tfvars` / workspace variables (not hidden defaults).
+Review the environment values in `main.tf` before applying. The dev environment is code-owned; it does not require a tfvars file.
 
 Personal account note:
 
@@ -159,39 +167,36 @@ Then run:
 
 After this first run completes, continue with state import into the workspace created above.
 
-## Reuse same code for dev/prod
+## Reuse same module for dev/prod
 
-Use separate var files per environment:
+Use separate environment roots:
 
-- `terraform-bootstrap/environments/dev.tfvars.example`
-- `terraform-bootstrap/environments/prod.tfvars.example`
+- `terraform-bootstrap/envs/dev`
+- `terraform-bootstrap/envs/prod`
 
-Create real files from examples (do not commit real tfvars):
+Each environment calls the shared module in `terraform-bootstrap/modules/bootstrap`.
 
-```bash
-cd terraform-bootstrap
-cp environments/dev.tfvars.example environments/dev.tfvars
-cp environments/prod.tfvars.example environments/prod.tfvars
-```
-
-Run with explicit env var file:
+Run dev:
 
 ```bash
+cd terraform-bootstrap/envs/dev
 /usr/bin/terraform init
-/usr/bin/terraform plan -var-file="environments/dev.tfvars"
-/usr/bin/terraform apply -var-file="environments/dev.tfvars"
+/usr/bin/terraform plan
+/usr/bin/terraform apply
 ```
 
-For prod:
+Run prod:
 
 ```bash
-/usr/bin/terraform plan -var-file="environments/prod.tfvars"
-/usr/bin/terraform apply -var-file="environments/prod.tfvars"
+cd terraform-bootstrap/envs/prod
+/usr/bin/terraform init
+/usr/bin/terraform plan
+/usr/bin/terraform apply
 ```
 
 ## Download local state and import to Terraform workspace
 
-From Cloud Shell (inside `terraform-bootstrap/`):
+From Cloud Shell (inside `terraform-bootstrap/envs/dev/`):
 
 ```bash
 /usr/bin/terraform state pull > terraform-state-export.tfstate
@@ -211,7 +216,7 @@ Then in Terraform Cloud/Enterprise workspace:
 - Settings -> State Versions -> Upload
 - upload `terraform-state-export.tfstate`
 
-After upload, set workspace working directory to `terraform-bootstrap/` (if using VCS repo integration).
+After upload, set workspace working directory to `terraform-bootstrap/envs/dev` (if using VCS repo integration).
 
 ## After import: switch to TFE-managed runs only
 
@@ -230,13 +235,7 @@ Optional hardening:
 
 ### Terraform variables (workspace)
 
-- `project_id`
-- `create_project` (typically `false` after first run)
-- `project_name` (optional)
-- `org_id` or `folder_id` (if still needed)
-- `billing_account` (if still needed)
-- `tfe_workspace_id`
-- optional overrides (`bootstrap_roles`, pool/provider IDs, labels)
+No Terraform variables are required for the code-owned bootstrap environment roots. Dev values live in `terraform-bootstrap/envs/dev/main.tf`; prod values live in `terraform-bootstrap/envs/prod/main.tf`.
 
 ### Environment variables for GCP OIDC (workspace)
 
@@ -250,7 +249,7 @@ Optional hardening:
 1. After first Cloud Shell apply, capture outputs:
 
 ```bash
-cd terraform-bootstrap
+cd terraform-bootstrap/envs/dev
 /usr/bin/terraform output -raw tfe_workload_identity_provider
 /usr/bin/terraform output -raw bootstrap_service_account_email
 /usr/bin/terraform output -raw bootstrap_project_id
@@ -268,9 +267,9 @@ cd terraform-bootstrap
 - `TFC_GCP_PLAN_SERVICE_ACCOUNT_EMAIL` = SA email for plan
 - `TFC_GCP_APPLY_SERVICE_ACCOUNT_EMAIL` = SA email for apply
 
-4. Ensure Terraform variable `tfe_workspace_id` matches the exact workspace ID (`ws-...`) running this code.
+4. Ensure the environment root code contains the exact bootstrap workspace ID (`ws-...`) running this code.
 
-5. Keep workspace working directory set to `terraform-bootstrap/`.
+5. Keep workspace working directory set to `terraform-bootstrap/envs/dev`.
 
 6. Trigger a plan from workspace UI and confirm OIDC auth works before apply.
 
@@ -278,7 +277,7 @@ cd terraform-bootstrap
 
 Configure these in TFE/TFC workspace settings:
 
-- Terraform working directory: `terraform-bootstrap/`
+- Terraform working directory: `terraform-bootstrap/envs/dev`
 - Auto-apply: `OFF` (manual approval recommended for bootstrap/IAM changes)
 - VCS trigger type: `Branch-based`
 - VCS branch: your active deployment branch (`main` or `develop`, based on your process)
@@ -328,7 +327,7 @@ If state is still local, destroy from the same local directory/context used for 
 
 ## Check state and destroy runbook
 
-From `terraform-bootstrap/`:
+From `terraform-bootstrap/envs/dev/`:
 
 ```bash
 /usr/bin/terraform state list
@@ -347,7 +346,7 @@ Optional: backup state before destroy:
 Destroy local-state resources (dev example):
 
 ```bash
-/usr/bin/terraform destroy -var-file="environments/dev.tfvars"
+/usr/bin/terraform destroy
 ```
 
 Verify state is empty after destroy:

@@ -18,11 +18,6 @@ variable "org_id" {
   description = "GCP organization ID used when create_project=true and folder_id is not set"
   type        = string
   default     = null
-
-  validation {
-    condition     = !var.create_project || ((var.org_id != null) != (var.folder_id != null))
-    error_message = "When create_project=true, set exactly one of org_id or folder_id."
-  }
 }
 
 variable "folder_id" {
@@ -35,11 +30,6 @@ variable "billing_account" {
   description = "Billing account ID to attach when create_project=true"
   type        = string
   default     = null
-
-  validation {
-    condition     = !var.create_project || var.billing_account != null
-    error_message = "billing_account is required when create_project=true."
-  }
 }
 
 variable "project_labels" {
@@ -75,6 +65,12 @@ variable "oidc_issuer_uri" {
 variable "tfe_workspace_id" {
   description = "Terraform workspace ID allowed to impersonate bootstrap service account"
   type        = string
+}
+
+variable "additional_tfe_workspace_ids" {
+  description = "Additional Terraform workspace IDs allowed to impersonate bootstrap service account"
+  type        = list(string)
+  default     = []
 }
 
 variable "workload_identity_pool_id" {

@@ -1,22 +1,6 @@
-terraform {
-  required_version = ">= 1.5.0"
-  # Backend intentionally not configured here.
-  # First run uses local state, then state is imported to TFE/TFC workspace.
-
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "google" {
-  project = var.project_id
-}
-
 locals {
-  target_project_id = var.project_id
+  target_project_id         = var.project_id
+  trusted_tfe_workspace_ids = distinct(concat([var.tfe_workspace_id], var.additional_tfe_workspace_ids))
 }
 
 resource "google_project" "bootstrap" {
@@ -89,26 +73,13 @@ resource "google_iam_workload_identity_pool_provider" "tfe_provider" {
     issuer_uri = var.oidc_issuer_uri
   }
 
-  attribute_condition = "assertion.terraform_workspace_id == '${var.tfe_workspace_id}'"
+  attribute_condition = "assertion.terraform_workspace_id in [${join(", ", [for workspace_id in local.trusted_tfe_workspace_ids : "'${workspace_id}'"])}]"
 }
 
 resource "google_service_account_iam_member" "tfe_oidc_impersonation" {
+  for_each = toset(local.trusted_tfe_workspace_ids)
+
   service_account_id = google_service_account.bootstrap.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/projects/${data.google_project.current.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.tfe_pool.workload_identity_pool_id}/attribute.terraform_workspace_id/${var.tfe_workspace_id}"
-}
-
-output "bootstrap_project_id" {
-  value       = local.target_project_id
-  description = "Bootstrap project ID where resources are created"
-}
-
-output "bootstrap_service_account_email" {
-  value       = google_service_account.bootstrap.email
-  description = "Email of the bootstrap service account"
-}
-
-output "tfe_workload_identity_provider" {
-  value       = google_iam_workload_identity_pool_provider.tfe_provider.name
-  description = "Full Workload Identity Provider name for Terraform workspace OIDC"
+  member             = "principalSet://iam.googleapis.com/projects/${data.google_project.current.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.tfe_pool.workload_identity_pool_id}/attribute.terraform_workspace_id/${each.value}"
 }

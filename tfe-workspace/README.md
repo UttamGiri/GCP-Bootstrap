@@ -58,15 +58,25 @@ TFE authenticates to GCP before Terraform runs by using workspace environment va
 - `TFC_GCP_WORKLOAD_PROVIDER_NAME=projects/1071237146360/locations/global/workloadIdentityPools/tfe-pool-dev-3/providers/tfe-provider-dev-3`
 - `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=bs-tfe-sa@bootstrap-prj-500323.iam.gserviceaccount.com`
 
-The bootstrap workspace must also trust the `tfe-dev` workspace ID by setting:
+The bootstrap WIF provider must also trust the `tfe-dev` workspace ID. If it only trusts the bootstrap workspace ID, apply fails with:
+
+```text
+oauth2/google: status code 400: {"error":"unauthorized_client","error_description":"The given credential is rejected by the attribute condition."}
+```
+
+Fix:
+
+1. Copy the `tfe-dev` workspace ID from TFE workspace settings.
+2. Add it to the bootstrap workspace Terraform variable:
 
 ```hcl
 additional_tfe_workspace_ids = [
-  "ws-xxxxxxxxxxxxxxxx"
+  "ws-2UNjJ7BXhV5ZnrAG"
 ]
 ```
 
-Then run `apply` in the bootstrap workspace before running this workspace.
+3. Update bootstrap WIF trust by applying the bootstrap workspace.
+4. Re-run this workspace.
 
 ## What Terraform Checks
 
