@@ -114,3 +114,18 @@ Remote state access:
 - `tfe-prod` reads outputs from `bootstrap-prod`
 
 In the bootstrap workspace settings, allow the workload workspace as an authorized remote state consumer.
+
+If this is missing, the workload run fails with:
+
+```text
+Error retrieving state: forbidden
+This Terraform run is not authorized to read the state of the workspace 'bootstrap-dev'.
+```
+
+Fix in TFE:
+
+1. Open the matching bootstrap workspace, for example `bootstrap-dev`.
+2. Go to **Settings -> General -> Remote state sharing**.
+3. Choose **Share with specific workspaces**.
+4. Add the workload workspace, for example `GCP-tfe-workspace`.
+5. Save and re-run the workload workspace.

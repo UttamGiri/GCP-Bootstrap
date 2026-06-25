@@ -64,6 +64,8 @@ That means the `TFC_GCP_*` variables are present, but GCP rejected the workspace
 
 If bootstrap fails while updating the WIF provider with `iam.workloadIdentityPoolProviders.update denied`, the bootstrap service account needs `roles/iam.workloadIdentityPoolAdmin`. The environment roots include that role in `bootstrap_roles` so bootstrap can update its own WIF provider condition.
 
+If `tfe-dev` reads bootstrap outputs and fails with `Error retrieving state: forbidden`, enable remote state sharing from `bootstrap-dev` to the workload workspace under **Settings -> General -> Remote state sharing**.
+
 ## Prerequisites
 
 - Access to Google Cloud Shell (or any environment with working gcloud auth)
