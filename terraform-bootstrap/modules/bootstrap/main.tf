@@ -74,6 +74,8 @@ resource "google_iam_workload_identity_pool_provider" "tfe_provider" {
   }
 
   attribute_condition = "assertion.terraform_workspace_id in [${join(", ", [for workspace_id in local.trusted_tfe_workspace_ids : "'${workspace_id}'"])}]"
+
+  depends_on = [google_project_iam_member.bootstrap_roles]
 }
 
 resource "google_service_account_iam_member" "tfe_oidc_impersonation" {
