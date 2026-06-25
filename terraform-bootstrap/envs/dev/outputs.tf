@@ -14,7 +14,7 @@ output "tfe_workload_identity_provider" {
 }
 
 # Output-only marker used to trigger a harmless bootstrap workspace apply.
-output "bootstrap_layout" {
-  value       = "terraform-bootstrap/envs/dev"
-  description = "Bootstrap environment root used by this workspace"
-}
+# output "bootstrap_layout" {
+#   value       = "terraform-bootstrap/envs/dev"
+#   description = "Bootstrap environment root used by this workspace"
+# }
