@@ -55,8 +55,8 @@ TFE authenticates to GCP before Terraform runs by using workspace environment va
 
 - `TFC_GCP_PROVIDER_AUTH=true`
 - `TFC_GCP_PRINCIPAL_TYPE=service_account`
-- `TFC_GCP_WORKLOAD_PROVIDER_NAME=<bootstrap workspace output tfe_workload_identity_provider>`
-- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=<bootstrap workspace output bootstrap_service_account_email>`
+- `TFC_GCP_WORKLOAD_PROVIDER_NAME=projects/1071237146360/locations/global/workloadIdentityPools/tfe-pool-dev-3/providers/tfe-provider-dev-3`
+- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=bs-tfe-sa@bootstrap-prj-500323.iam.gserviceaccount.com`
 
 The bootstrap workspace must also trust the `tfe-dev` workspace ID by setting:
 
@@ -91,17 +91,8 @@ Recommended settings:
 
 - **Execution mode:** Remote
 - **Working directory:** `tfe-workspace/envs/dev` or `tfe-workspace/envs/prod`
-- **Remote state sharing:** allow access to the bootstrap workspace outputs
 - **Auto-apply:** Off
 
 No Terraform variables are required for bucket names or bucket settings. Those values are in the environment code.
 
-## Required Bootstrap Output Access
-
-This configuration reads:
-
-```hcl
-data "terraform_remote_state" "bootstrap"
-```
-
-The bootstrap workspace must share state with this workspace. In TFE/TFC, enable remote state sharing from `bootstrap-dev` to `tfe-dev`.
+This configuration does not read `bootstrap-dev` remote state. It uses its own TFE workspace state for managed resources.
