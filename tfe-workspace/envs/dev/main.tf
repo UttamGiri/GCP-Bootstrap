@@ -9,8 +9,22 @@ terraform {
   }
 }
 
+data "terraform_remote_state" "bootstrap" {
+  backend = "remote"
+
+  config = {
+    organization = "vaflt-org"
+
+    workspaces = {
+      name = "bootstrap-dev"
+    }
+  }
+}
+
 locals {
-  project_id = "bootstrap-prj-500323"
+  project_id                      = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
+  bootstrap_service_account_email = data.terraform_remote_state.bootstrap.outputs.bootstrap_service_account_email
+  tfe_workload_identity_provider  = data.terraform_remote_state.bootstrap.outputs.tfe_workload_identity_provider
 }
 
 provider "google" {

@@ -55,8 +55,8 @@ TFE authenticates to GCP before Terraform runs by using workspace environment va
 
 - `TFC_GCP_PROVIDER_AUTH=true`
 - `TFC_GCP_PRINCIPAL_TYPE=service_account`
-- `TFC_GCP_WORKLOAD_PROVIDER_NAME=projects/1071237146360/locations/global/workloadIdentityPools/tfe-pool-dev-3/providers/tfe-provider-dev-3`
-- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=bs-tfe-sa@bootstrap-prj-500323.iam.gserviceaccount.com`
+- `TFC_GCP_WORKLOAD_PROVIDER_NAME=<bootstrap output tfe_workload_identity_provider>`
+- `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=<bootstrap output bootstrap_service_account_email>`
 
 The bootstrap WIF provider must also trust the `tfe-dev` workspace ID. If it only trusts the bootstrap workspace ID, apply fails with:
 
@@ -67,7 +67,7 @@ oauth2/google: status code 400: {"error":"unauthorized_client","error_descriptio
 Fix:
 
 1. Copy the `tfe-dev` workspace ID from TFE workspace settings.
-2. Add it to the bootstrap workspace Terraform variable:
+2. Add it to the bootstrap dev environment code:
 
 ```hcl
 additional_tfe_workspace_ids = [
@@ -101,8 +101,16 @@ Recommended settings:
 
 - **Execution mode:** Remote
 - **Working directory:** `tfe-workspace/envs/dev` or `tfe-workspace/envs/prod`
+- **Remote state sharing:** allow this workspace to read the matching bootstrap workspace outputs
 - **Auto-apply:** Off
 
 No Terraform variables are required for bucket names or bucket settings. Those values are in the environment code.
 
-This configuration does not read `bootstrap-dev` remote state. It uses its own TFE workspace state for managed resources.
+This configuration uses its own TFE workspace state for managed resources, but reads bootstrap outputs with `terraform_remote_state`.
+
+Remote state access:
+
+- `tfe-dev` reads outputs from `bootstrap-dev`
+- `tfe-prod` reads outputs from `bootstrap-prod`
+
+In the bootstrap workspace settings, allow the workload workspace as an authorized remote state consumer.
