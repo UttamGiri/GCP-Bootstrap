@@ -12,3 +12,9 @@ output "tfe_workload_identity_provider" {
   value       = module.bootstrap.tfe_workload_identity_provider
   description = "Full Workload Identity Provider name for Terraform workspace OIDC"
 }
+
+# Output-only marker used to trigger a harmless bootstrap workspace apply.
+output "bootstrap_layout" {
+  value       = "terraform-bootstrap/envs/prod"
+  description = "Bootstrap environment root used by this workspace"
+}
