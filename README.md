@@ -1,6 +1,6 @@
 # GCP Bootstrap (Unified Stack)
 
-This repository uses one Terraform stack in `terraform/` that handles:
+This repository uses one Terraform stack in `terraform-bootstrap/` that handles:
 
 - bootstrap project usage (existing project mode by default)
 - bootstrap service account `bs-tfe-sa`
@@ -9,6 +9,8 @@ This repository uses one Terraform stack in `terraform/` that handles:
 - IAM roles for the bootstrap service account
 - impersonation binding for a specific Terraform workspace ID
 
+It also includes separate TFE workspace configurations under `tfe-workspace/envs/` for environments such as dev and prod. Those configurations currently create GCP storage buckets.
+
 ## Intended operating model
 
 1. Run Terraform first from Google Cloud Shell with local state.
@@ -16,6 +18,32 @@ This repository uses one Terraform stack in `terraform/` that handles:
 3. Import that state into a Terraform Cloud/Enterprise workspace.
 4. Configure workspace variables (including GCP OIDC env vars).
 5. Run future updates from Terraform workspace UI.
+
+## Two-workspace model
+
+Use two separate TFE/TFC workspaces:
+
+- `bootstrap-dev`: runs `terraform-bootstrap/`
+- `tfe-dev`: runs `tfe-workspace/envs/dev`
+- `tfe-prod`: runs `tfe-workspace/envs/prod`
+
+The bootstrap workspace creates and owns:
+
+- bootstrap service account
+- WIF pool/provider
+- IAM roles
+- WIF impersonation bindings for trusted TFE workspace IDs
+
+The `tfe-dev` and `tfe-prod` workspaces use the bootstrap service account and WIF provider to run separate Terraform configurations. In this repo, the environment folders under `tfe-workspace/envs/` create GCP storage buckets.
+
+Important concept:
+
+- GCP authentication is not determined by the `tfe-dev` Terraform state.
+- GCP authentication is determined by `TFC_GCP_*` environment variables in the `tfe-dev` workspace.
+- Resource existence is determined by the `tfe-dev` workspace state plus refresh against GCP.
+- Bootstrap outputs are read with `terraform_remote_state` for reference, but the TFE workspace environment variables must still be set before the run starts.
+
+Before running `tfe-dev`, the bootstrap WIF provider must trust the `tfe-dev` workspace ID. The bootstrap stack in `terraform-bootstrap/` is intentionally kept separate and should only be changed when you are ready to update bootstrap trust.
 
 ## Prerequisites
 
@@ -78,7 +106,7 @@ rm -rf ~/GCP-Booptstrap
 2. Inside that project, create a new workspace.
 3. Choose **Version Control Workflow**.
 4. Connect this GitHub repository.
-5. Set workspace **Working Directory** to `terraform/`.
+5. Set workspace **Working Directory** to `terraform-bootstrap/`.
 6. Save workspace and copy the workspace ID (`ws-xxxxxxxxxxxxxxxx`) from workspace settings/details.
 
 Notes:
@@ -90,7 +118,7 @@ Notes:
 
 Backend note:
 
-- There is no explicit backend block in `terraform/main.tf`.
+- There is no explicit backend block in `terraform-bootstrap/main.tf`.
 - Terraform therefore uses the default local backend (`terraform.tfstate` in working directory).
 - Local backend is used by omission until you move/import state to TFE workspace.
 
@@ -102,7 +130,7 @@ zip -r gcp-bootstrap.zip . -x ".git/*" -x ".DS_Store"
 
 ```bash
 unzip gcp-bootstrap.zip -d gcp-bootstrap
-cd gcp-bootstrap/terraform
+cd gcp-bootstrap/terraform-bootstrap
 # create terraform.tfvars manually (see required values below)
 ```
 
@@ -135,13 +163,13 @@ After this first run completes, continue with state import into the workspace cr
 
 Use separate var files per environment:
 
-- `terraform/environments/dev.tfvars.example`
-- `terraform/environments/prod.tfvars.example`
+- `terraform-bootstrap/environments/dev.tfvars.example`
+- `terraform-bootstrap/environments/prod.tfvars.example`
 
 Create real files from examples (do not commit real tfvars):
 
 ```bash
-cd terraform
+cd terraform-bootstrap
 cp environments/dev.tfvars.example environments/dev.tfvars
 cp environments/prod.tfvars.example environments/prod.tfvars
 ```
@@ -163,20 +191,27 @@ For prod:
 
 ## Download local state and import to Terraform workspace
 
-From Cloud Shell (inside `terraform/`):
+From Cloud Shell (inside `terraform-bootstrap/`):
 
 ```bash
-/usr/bin/terraform state pull > terraform.tfstate
+/usr/bin/terraform state pull > terraform-state-export.tfstate
+ls -lah terraform-state-export.tfstate
 ```
 
-Download `terraform.tfstate` to your PC (Cloud Shell file browser download is fine).
+Download `terraform-state-export.tfstate` to your PC (Cloud Shell file browser download is fine).
+
+Important:
+
+- Do **not** run `/usr/bin/terraform state pull > terraform.tfstate` when using local backend.
+- That can truncate/overwrite the active local state file before Terraform reads it.
+- Always export to a different filename, such as `terraform-state-export.tfstate`.
 
 Then in Terraform Cloud/Enterprise workspace:
 
 - Settings -> State Versions -> Upload
-- upload `terraform.tfstate`
+- upload `terraform-state-export.tfstate`
 
-After upload, set workspace working directory to `terraform/` (if using VCS repo integration).
+After upload, set workspace working directory to `terraform-bootstrap/` (if using VCS repo integration).
 
 ## After import: switch to TFE-managed runs only
 
@@ -215,7 +250,7 @@ Optional hardening:
 1. After first Cloud Shell apply, capture outputs:
 
 ```bash
-cd terraform
+cd terraform-bootstrap
 /usr/bin/terraform output -raw tfe_workload_identity_provider
 /usr/bin/terraform output -raw bootstrap_service_account_email
 /usr/bin/terraform output -raw bootstrap_project_id
@@ -235,7 +270,7 @@ cd terraform
 
 4. Ensure Terraform variable `tfe_workspace_id` matches the exact workspace ID (`ws-...`) running this code.
 
-5. Keep workspace working directory set to `terraform/`.
+5. Keep workspace working directory set to `terraform-bootstrap/`.
 
 6. Trigger a plan from workspace UI and confirm OIDC auth works before apply.
 
@@ -243,12 +278,12 @@ cd terraform
 
 Configure these in TFE/TFC workspace settings:
 
-- Terraform working directory: `terraform/`
+- Terraform working directory: `terraform-bootstrap/`
 - Auto-apply: `OFF` (manual approval recommended for bootstrap/IAM changes)
 - VCS trigger type: `Branch-based`
 - VCS branch: your active deployment branch (`main` or `develop`, based on your process)
 - Automatic run triggering: `Only trigger runs when files in specified paths change`
-- Trigger paths: `terraform/**`
+- Trigger paths: `terraform-bootstrap/**`
 - Pull requests -> Automatic speculative plans: `ON`
 - Include submodules on clone: `OFF` (enable only if your repo actually uses git submodules)
 
@@ -293,7 +328,7 @@ If state is still local, destroy from the same local directory/context used for 
 
 ## Check state and destroy runbook
 
-From `terraform/`:
+From `terraform-bootstrap/`:
 
 ```bash
 /usr/bin/terraform state list
