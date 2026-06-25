@@ -1,0 +1,35 @@
+project_id       = "bootstrap-prj-500323"
+create_project   = false
+# folder_id      = "123456789012" # Preferred when create_project=true
+# org_id         = "2336890507"   # Fallback if folder_id is not used (only when create_project=true)
+# billing_account = "019135-583951-885F1C" # Needed only when create_project=true
+tfe_workspace_id = "ws-D2eEpkBSCE55LBq9"
+project_name     = "Bootstrap Dev Project"
+
+bootstrap_service_account_name         = "bs-tfe-sa"
+bootstrap_service_account_display_name = "Bootstrap Terraform Enterprise Service Account"
+oidc_issuer_uri                        = "https://app.terraform.io"
+workload_identity_pool_id              = "tfe-pool-dev-3"
+workload_identity_pool_display_name    = "TFE Pool Dev"
+workload_identity_provider_id          = "tfe-provider-dev-3"
+workload_identity_provider_display_name = "TFE OIDC Provider Dev"
+
+project_labels = {
+  environment = "dev"
+  owner       = "platform"
+}
+
+required_services = [
+  "cloudresourcemanager.googleapis.com",
+  "iam.googleapis.com",
+  "iamcredentials.googleapis.com",
+  "sts.googleapis.com"
+]
+
+bootstrap_roles = [
+  "roles/viewer",
+  "roles/storage.admin",
+  "roles/resourcemanager.projectIamAdmin",
+  "roles/iam.serviceAccountAdmin",
+  "roles/iam.serviceAccountTokenCreator"
+]
