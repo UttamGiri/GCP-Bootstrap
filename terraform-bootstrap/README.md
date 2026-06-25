@@ -14,7 +14,7 @@ terraform-bootstrap/
 TFE workspace working directories:
 
 ```text
-bootstrap-dev  -> terraform-bootstrap/envs/dev
+GCP-Bootstrap  -> terraform-bootstrap/envs/dev
 bootstrap-prod -> terraform-bootstrap/envs/prod
 ```
 

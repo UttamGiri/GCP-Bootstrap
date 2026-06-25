@@ -23,7 +23,7 @@ It also includes separate TFE workspace configurations under `tfe-workspace/envs
 
 Use two separate TFE/TFC workspaces:
 
-- `bootstrap-dev`: runs `terraform-bootstrap/envs/dev`
+- `GCP-Bootstrap`: runs `terraform-bootstrap/envs/dev`
 - `bootstrap-prod`: runs `terraform-bootstrap/envs/prod`
 - `tfe-dev`: runs `tfe-workspace/envs/dev`
 - `tfe-prod`: runs `tfe-workspace/envs/prod`
@@ -64,7 +64,7 @@ That means the `TFC_GCP_*` variables are present, but GCP rejected the workspace
 
 If bootstrap fails while updating the WIF provider with `iam.workloadIdentityPoolProviders.update denied`, the bootstrap service account needs `roles/iam.workloadIdentityPoolAdmin`. The environment roots include that role in `bootstrap_roles` so bootstrap can update its own WIF provider condition.
 
-If `tfe-dev` reads bootstrap outputs and fails with `Error retrieving state: forbidden`, enable remote state sharing from `bootstrap-dev` to the workload workspace under **Settings -> General -> Remote state sharing**.
+If `tfe-dev` reads bootstrap outputs and fails with `Error retrieving state: forbidden`, enable remote state sharing from `GCP-Bootstrap` to the workload workspace under **Settings -> General -> Remote state sharing**.
 
 ## Prerequisites
 

@@ -16,7 +16,7 @@ data "terraform_remote_state" "bootstrap" {
     organization = "vaflt-org"
 
     workspaces = {
-      name = "bootstrap-dev"
+      name = "GCP-Bootstrap"
     }
   }
 }
