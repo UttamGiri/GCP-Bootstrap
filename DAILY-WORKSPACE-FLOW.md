@@ -121,7 +121,7 @@ TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=&lt;GCP-Bootstrap output bootstrap_service_acc
 The first run creates:
 
 - workload service account, for example `gcp-tfe-workspace-sa`
-- workload WIF pool/provider, for example `gcp-tfe-workspace-pool`
+- workload WIF pool/provider, for example `tfe-workspace-pool` / `tfe-workspace-provider`
 - impersonation binding for workspace `ws-2UNjJ7BXhV5ZnrAG`
 - workload resources such as buckets, VPCs, and application infrastructure
 
@@ -167,8 +167,8 @@ Daily destroy should remove only workload resources that are safe to recreate.
 **Do not destroy** unless you intentionally want to repeat the bootstrap-identity handoff:
 
 - `gcp-tfe-workspace-sa`
-- `gcp-tfe-workspace-pool`
-- `gcp-tfe-workspace-provider`
+- `tfe-workspace-pool`
+- `tfe-workspace-provider`
 - impersonation binding for the TFE workspace
 
 If those identity resources are destroyed, the next run cannot authenticate with the workload identity. Switch the TFE environment variables back to bootstrap values and run the first-run flow again.

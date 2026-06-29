@@ -49,9 +49,9 @@ module "workspace_identity" {
     "roles/iam.workloadIdentityPoolAdmin",
   ]
 
-  workload_identity_pool_id               = "gcp-tfe-prod-pool"
+  workload_identity_pool_id               = "tfe-prod-pool"
   workload_identity_pool_display_name     = "GCP TFE Prod"
-  workload_identity_provider_id           = "gcp-tfe-prod-provider"
+  workload_identity_provider_id           = "tfe-prod-provider"
   workload_identity_provider_display_name = "GCP TFE Prod"
 }
 
