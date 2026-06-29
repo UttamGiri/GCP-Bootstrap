@@ -67,8 +67,8 @@ module "storage_buckets" {
   }
 
   buckets = {
-    state = {
-      name               = "bootstrap-prj-500323-tfe-prod-state"
+    workload = {
+      name               = "bootstrap-prj-500323-tfe-prod-workload"
       location           = "US"
       force_destroy      = false
       versioning_enabled = true
