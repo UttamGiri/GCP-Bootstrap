@@ -58,6 +58,26 @@ TFE authenticates to GCP before Terraform runs by using workspace environment va
 - `TFC_GCP_WORKLOAD_PROVIDER_NAME=<bootstrap output tfe_workload_identity_provider>`
 - `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=<bootstrap output bootstrap_service_account_email>`
 
+First run:
+
+- `GCP-tfe-workspace` uses the bootstrap service account from `GCP-Bootstrap`.
+- It creates its own workspace service account and WIF pool/provider.
+- It outputs `workspace_service_account_email` and `workspace_workload_identity_provider`.
+
+Consecutive runs:
+
+- Update `GCP-tfe-workspace` environment variables to use its own outputs:
+
+```text
+TFC_GCP_WORKLOAD_PROVIDER_NAME=<workspace output workspace_workload_identity_provider>
+TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=<workspace output workspace_service_account_email>
+```
+
+- Keep `TFC_GCP_PROVIDER_AUTH=true`.
+- Keep `TFC_GCP_PRINCIPAL_TYPE=service_account`.
+
+Important: Terraform cannot switch these auth values during the same run because TFE reads them before Terraform starts.
+
 The bootstrap WIF provider must also trust the `tfe-dev` workspace ID. If it only trusts the bootstrap workspace ID, apply fails with:
 
 ```text

@@ -42,7 +42,8 @@ Important concept:
 - GCP authentication is not determined by the `tfe-dev` Terraform state.
 - GCP authentication is determined by `TFC_GCP_*` environment variables in the `tfe-dev` workspace.
 - Resource existence is determined by the `tfe-dev` workspace state plus refresh against GCP.
-- Workload workspaces keep their own resource state, but can read bootstrap outputs with `terraform_remote_state` when remote state sharing is authorized. GCP authentication still comes from `TFC_GCP_*` environment variables set on the workspace before the run starts.
+- Workload workspaces keep their own resource state, but read bootstrap outputs with `terraform_remote_state`. `GCP-Bootstrap` must share state with `GCP-tfe-workspace` under **Settings -> General -> Remote state sharing**.
+- GCP authentication still comes from `TFC_GCP_*` environment variables set on the workspace before the run starts.
 
 Before running `tfe-dev`, the bootstrap WIF provider must trust the `tfe-dev` workspace ID. The bootstrap dev root in `terraform-bootstrap/envs/dev` is intentionally kept separate and should only be changed when you are ready to update bootstrap trust.
 
