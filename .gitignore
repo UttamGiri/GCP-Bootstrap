@@ -10,3 +10,6 @@ info.txt
 */info.txt
 crash.log
 *.tfvars
+*.jpeg
+*.jpg
+*.png

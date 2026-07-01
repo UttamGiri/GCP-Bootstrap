@@ -21,3 +21,5 @@ bootstrap-prod -> terraform-bootstrap/envs/prod
 Environment-specific values are code-owned in each `envs/*/main.tf`. Do not put bootstrap infrastructure inventory in TFE workspace variables.
 
 The `envs/dev` root includes `moved` blocks to migrate existing bootstrap state from the old root configuration into `module.bootstrap` addresses without recreating resources.
+
+`GCP-Bootstrap` is the state producer for workload workspaces. If a workload workspace reads bootstrap outputs with `terraform_remote_state`, configure `GCP-Bootstrap` **Settings -> General -> Remote state sharing** to authorize that workload workspace, for example `GCP-tfe-workspace`.
