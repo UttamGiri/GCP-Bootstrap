@@ -1,15 +1,18 @@
 name: Destroy TFE Workload and Reset Bootstrap Auth
 
-# Queues a destroy run in the workload TFE workspace, applies it, then copies
-# bootstrap GCP auth env vars back to the workload workspace for a fresh first run.
+# Full identity cycle:
+#   1. Destroy all workload resources in TFE/GCP
+#   2. Copy bootstrap TFC_GCP_* -> workload (first-run auth via bs-tfe-sa)
+#   3. Apply run -> Terraform creates workload SA + WIF + bucket
+#   4. Copy workload outputs -> TFC_GCP_* (self-run auth for later runs)
 #
 # Required GitHub secrets:
 #   TFE_TOKEN            - user API token
 #   TFE_WORKSPACE_ID     - workload workspace ID (ws-8nSCANEJTL1guUNk)
 #
 # Optional variables:
-#   TFE_HOSTNAME         - default app.terraform.io
-#   TFE_ORG              - default vaflt-org
+#   TFE_HOSTNAME                 - default app.terraform.io
+#   TFE_ORG                      - default vaflt-org
 #   TFE_BOOTSTRAP_WORKSPACE_NAME - default GCP-Bootstrap
 
 on:
@@ -19,21 +22,26 @@ on:
         description: 'Type destroy to confirm full workspace destroy'
         required: true
         type: string
+      recreate_after_destroy:
+        description: After destroy, apply once and hand off auth to new workload identity
+        required: false
+        type: boolean
+        default: true
       message:
         description: Message shown on the TFE destroy run
         required: false
-        default: Destroy queued from GitHub Actions
+        default: Destroy and recreate from GitHub Actions
 
 jobs:
-  destroy-and-reset-auth:
-    name: Destroy workload in TFE and reset TFC_GCP_* vars
+  destroy-recreate-and-handoff:
+    name: Destroy, reset bootstrap auth, recreate, hand off workload auth
     runs-on: ubuntu-latest
     if: github.event.inputs.confirm == 'destroy'
     permissions:
       contents: read
 
     steps:
-      - name: Destroy in TFE and copy bootstrap auth variables
+      - name: Run destroy + recreate identity cycle
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
           TFE_WORKSPACE_ID: ${{ secrets.TFE_WORKSPACE_ID }}
@@ -41,6 +49,7 @@ jobs:
           TFE_ORG: ${{ vars.TFE_ORG }}
           TFE_BOOTSTRAP_WORKSPACE_NAME: ${{ vars.TFE_BOOTSTRAP_WORKSPACE_NAME }}
           RUN_MESSAGE: ${{ github.event.inputs.message }}
+          RECREATE: ${{ github.event.inputs.recreate_after_destroy }}
         run: |
           set -euo pipefail
 
@@ -107,7 +116,7 @@ jobs:
                 '
           }
 
-          resolve_auth_value() {
+          resolve_bootstrap_auth_value() {
             local bootstrap_key="$1"
             local output_key="$2"
             local val
@@ -118,106 +127,6 @@ jobs:
             fi
             read_output_from_workspace "$BOOTSTRAP_ID" "$output_key"
           }
-
-          SA_EMAIL=$(resolve_auth_value "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "bootstrap_service_account_email")
-          WIF_PROVIDER=$(resolve_auth_value "TFC_GCP_WORKLOAD_PROVIDER_NAME" "tfe_workload_identity_provider")
-
-          if [ -z "$SA_EMAIL" ] || [ -z "$WIF_PROVIDER" ]; then
-            echo "Could not resolve bootstrap auth values."
-            echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL / bootstrap_service_account_email: ${SA_EMAIL:-<empty>}"
-            echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME / tfe_workload_identity_provider: ${WIF_PROVIDER:-<empty>}"
-            echo "Set env vars on ${BOOTSTRAP_NAME} or ensure bootstrap outputs exist."
-            exit 1
-          fi
-
-          echo "Bootstrap auth values resolved (will copy to workload after destroy)."
-
-          echo "Queueing destroy run..."
-          RUN_RESPONSE=$(curl -sS \
-            --header "$(auth)" \
-            --header "Content-Type: application/vnd.api+json" \
-            --request POST \
-            --data "$(jq -n \
-              --arg ws "$WORKLOAD_ID" \
-              --arg msg "$RUN_MESSAGE" \
-              '{
-                data: {
-                  type: "runs",
-                  attributes: {
-                    message: $msg,
-                    "is-destroy": true
-                  },
-                  relationships: {
-                    workspace: {
-                      data: { type: "workspaces", id: $ws }
-                    }
-                  }
-                }
-              }')" \
-            "${API}/runs")
-
-          RUN_ID=$(echo "$RUN_RESPONSE" | jq -r '.data.id // empty')
-          if [ -z "$RUN_ID" ]; then
-            echo "Failed to queue destroy run"
-            echo "$RUN_RESPONSE" | jq '.errors // .'
-            exit 1
-          fi
-          echo "Destroy run queued: ${RUN_ID}"
-
-          poll_run_status() {
-            curl -sS \
-              --header "$(auth)" \
-              --header "Content-Type: application/vnd.api+json" \
-              "${API}/runs/${RUN_ID}" \
-              | jq -r '.data.attributes.status'
-          }
-
-          echo "Waiting for destroy plan..."
-          for i in $(seq 1 60); do
-            STATUS=$(poll_run_status)
-            echo "  plan poll ${i}: ${STATUS}"
-            case "$STATUS" in
-              planned) break ;;
-              errored|canceled|discarded) echo "Destroy plan failed: ${STATUS}"; exit 1 ;;
-            esac
-            sleep 10
-          done
-
-          if [ "$(poll_run_status)" != "planned" ]; then
-            echo "Timed out waiting for destroy plan"
-            exit 1
-          fi
-
-          echo "Applying destroy run..."
-          APPLY_RESPONSE=$(curl -sS \
-            --header "$(auth)" \
-            --header "Content-Type: application/vnd.api+json" \
-            --request POST \
-            "${API}/runs/${RUN_ID}/actions/apply")
-
-          if echo "$APPLY_RESPONSE" | jq -e '.errors' >/dev/null 2>&1; then
-            echo "Apply failed (enable Allow destroy plans on the workload workspace):"
-            echo "$APPLY_RESPONSE" | jq '.errors'
-            exit 1
-          fi
-
-          echo "Waiting for destroy apply..."
-          for i in $(seq 1 90); do
-            STATUS=$(poll_run_status)
-            echo "  apply poll ${i}: ${STATUS}"
-            case "$STATUS" in
-              applied) break ;;
-              errored|canceled|discarded) echo "Destroy apply failed: ${STATUS}"; exit 1 ;;
-            esac
-            sleep 10
-          done
-
-          if [ "$(poll_run_status)" != "applied" ]; then
-            echo "Timed out waiting for destroy apply"
-            exit 1
-          fi
-
-          echo "Destroy applied successfully."
 
           upsert_env_var() {
             local ws_id="$1"
@@ -238,10 +147,7 @@ jobs:
                 --header "Content-Type: application/vnd.api+json" \
                 --request PATCH \
                 --data "$(jq -n --arg val "$value" '{
-                  data: {
-                    type: "vars",
-                    attributes: { value: $val }
-                  }
+                  data: { type: "vars", attributes: { value: $val } }
                 }')" \
                 "${API}/vars/${existing_id}" >/dev/null
               echo "Updated ${key} on ${WORKLOAD_NAME}"
@@ -267,13 +173,154 @@ jobs:
             fi
           }
 
-          echo "Copying bootstrap auth variables to ${WORKLOAD_NAME}..."
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$SA_EMAIL"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$WIF_PROVIDER"
+          copy_bootstrap_auth_to_workload() {
+            local sa_email wif_provider
+            sa_email=$(resolve_bootstrap_auth_value "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "bootstrap_service_account_email")
+            wif_provider=$(resolve_bootstrap_auth_value "TFC_GCP_WORKLOAD_PROVIDER_NAME" "tfe_workload_identity_provider")
 
-          echo "Done. Workload auth reset to bootstrap for next first run."
-          echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}"
-          echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
+            if [ -z "$sa_email" ] || [ -z "$wif_provider" ]; then
+              echo "Could not resolve bootstrap auth values."
+              echo "  bootstrap SA: ${sa_email:-<empty>}"
+              echo "  bootstrap WIF: ${wif_provider:-<empty>}"
+              exit 1
+            fi
+
+            echo "Step 2: Copy bootstrap auth -> workload (first-run identity)..."
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$sa_email"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$wif_provider"
+          }
+
+          copy_workload_outputs_to_auth() {
+            local sa_email wif_provider
+            sa_email=$(read_output_from_workspace "$WORKLOAD_ID" "workspace_service_account_email")
+            wif_provider=$(read_output_from_workspace "$WORKLOAD_ID" "workspace_workload_identity_provider")
+
+            if [ -z "$sa_email" ] || [ -z "$wif_provider" ]; then
+              echo "Could not read workload outputs after apply."
+              echo "  workspace_service_account_email: ${sa_email:-<empty>}"
+              echo "  workspace_workload_identity_provider: ${wif_provider:-<empty>}"
+              exit 1
+            fi
+
+            echo "Step 4: Copy workload outputs -> TFC_GCP_* (self-run identity)..."
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$sa_email"
+            upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$wif_provider"
+            echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${sa_email}"
+            echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${wif_provider}"
+          }
+
+          queue_run() {
+            local destroy_flag="$1"
+            local message="$2"
+            curl -sS \
+              --header "$(auth)" \
+              --header "Content-Type: application/vnd.api+json" \
+              --request POST \
+              --data "$(jq -n \
+                --arg ws "$WORKLOAD_ID" \
+                --arg msg "$message" \
+                --argjson destroy "$destroy_flag" \
+                '{
+                  data: {
+                    type: "runs",
+                    attributes: { message: $msg, "is-destroy": $destroy },
+                    relationships: {
+                      workspace: { data: { type: "workspaces", id: $ws } }
+                    }
+                  }
+                }')" \
+              "${API}/runs"
+          }
+
+          poll_run_status() {
+            local run_id="$1"
+            curl -sS \
+              --header "$(auth)" \
+              --header "Content-Type: application/vnd.api+json" \
+              "${API}/runs/${run_id}" \
+              | jq -r '.data.attributes.status'
+          }
+
+          wait_for_status() {
+            local run_id="$1"
+            local want_status="$2"
+            local label="$3"
+            local max_polls="$4"
+            local i status
+            for i in $(seq 1 "$max_polls"); do
+              status=$(poll_run_status "$run_id")
+              echo "  ${label} poll ${i}: ${status}"
+              case "$status" in
+                "$want_status") return 0 ;;
+                errored|canceled|discarded)
+                  echo "${label} failed: ${status} (run ${run_id})"
+                  exit 1
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "Timed out waiting for ${label} (${want_status})"
+            exit 1
+          }
+
+          plan_and_apply_run() {
+            local run_id="$1"
+            local label="$2"
+            wait_for_status "$run_id" "planned" "${label} plan" 60
+            echo "Applying ${label} run ${run_id}..."
+            local apply_response
+            apply_response=$(curl -sS \
+              --header "$(auth)" \
+              --header "Content-Type: application/vnd.api+json" \
+              --request POST \
+              "${API}/runs/${run_id}/actions/apply")
+            if echo "$apply_response" | jq -e '.errors' >/dev/null 2>&1; then
+              echo "Apply failed for ${label}:"
+              echo "$apply_response" | jq '.errors'
+              exit 1
+            fi
+            wait_for_status "$run_id" "applied" "${label} apply" 90
+          }
+
+          echo "Step 1: Queue destroy run..."
+          RUN_RESPONSE=$(queue_run true "$RUN_MESSAGE")
+          DESTROY_RUN_ID=$(echo "$RUN_RESPONSE" | jq -r '.data.id // empty')
+          if [ -z "$DESTROY_RUN_ID" ]; then
+            echo "Failed to queue destroy run"
+            echo "$RUN_RESPONSE" | jq '.errors // .'
+            exit 1
+          fi
+          echo "Destroy run: ${DESTROY_RUN_ID}"
+          plan_and_apply_run "$DESTROY_RUN_ID" "destroy"
+          echo "Destroy complete."
+
+          copy_bootstrap_auth_to_workload
+
+          if [ "${RECREATE}" != "true" ]; then
+            echo "recreate_after_destroy=false — stopped after bootstrap auth reset."
+            exit 0
+          fi
+
+          echo "Step 3: Queue apply run (creates workload SA + WIF + bucket)..."
+          RUN_RESPONSE=$(queue_run false "Recreate after destroy (GitHub Actions)")
+          APPLY_RUN_ID=$(echo "$RUN_RESPONSE" | jq -r '.data.id // empty')
+          if [ -z "$APPLY_RUN_ID" ]; then
+            echo "Failed to queue apply run"
+            echo "$RUN_RESPONSE" | jq '.errors // .'
+            exit 1
+          fi
+          echo "Apply run: ${APPLY_RUN_ID}"
+          plan_and_apply_run "$APPLY_RUN_ID" "recreate"
+          echo "Recreate complete."
+
+          copy_workload_outputs_to_auth
+
+          echo ""
+          echo "Full cycle complete — workload uses its own SA + WIF for future runs."
 
   reject-unconfirmed:
     name: Destroy not confirmed
