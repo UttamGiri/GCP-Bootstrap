@@ -29,7 +29,8 @@ module "bootstrap" {
 
   tfe_workspace_id = "ws-D2eEpkBSCE55LBq9"
   additional_tfe_workspace_ids = [
-    "ws-2UNjJ7BXhV5ZnrAG"
+    "ws-2UNjJ7BXhV5ZnrAG",
+    "ws-8nSCANEJTL1guUNk"
   ]
 
   workload_identity_pool_id               = "tfe-pool-dev-3"
