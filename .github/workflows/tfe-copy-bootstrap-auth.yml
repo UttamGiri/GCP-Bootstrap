@@ -1,11 +1,11 @@
 name: TFE Copy Bootstrap Auth
 
-# After workload destroy in TFE, copy GCP-Bootstrap auth to GCP-tfe-workspace.
+# After successful destroy in GCP-tfe-workspace (terraform_data hook).
 #
-# Secrets (only these two):
-#   TFE_TOKEN          - TFE API token
-#   TFE_WORKSPACE_ID   - workload workspace ID (ws-...)
+# GitHub secret:
+#   TFE_TOKEN - TFE API token
 #
+# Target workspace: GCP-tfe-workspace (by name)
 # Trigger from TFE after successful destroy:
 #   POST https://api.github.com/repos/<owner>/<repo>/dispatches
 #   {"event_type":"tfe-workload-destroyed","client_payload":{"run_id":"run-xxx"}}
@@ -28,7 +28,6 @@ jobs:
       - name: Copy TFC_GCP auth variables
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
-          TFE_WORKSPACE_ID: ${{ secrets.TFE_WORKSPACE_ID }}
           TFE_RUN_ID: ${{ github.event.client_payload.run_id }}
         run: |
           set -euo pipefail
@@ -36,6 +35,7 @@ jobs:
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
           BOOTSTRAP_NAME="GCP-Bootstrap"
+          WORKLOAD_NAME="GCP-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
@@ -44,12 +44,6 @@ jobs:
             echo "Missing secret TFE_TOKEN"
             exit 1
           fi
-          if [ -z "${TFE_WORKSPACE_ID:-}" ]; then
-            echo "Missing secret TFE_WORKSPACE_ID"
-            exit 1
-          fi
-
-          WORKLOAD_ID="${TFE_WORKSPACE_ID}"
 
           resolve_workspace_id() {
             curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
@@ -115,9 +109,11 @@ jobs:
             exit 1
           fi
 
-          WORKLOAD_NAME=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-            "${API}/workspaces/${WORKLOAD_ID}" \
-            | jq -r '.data.attributes.name // "unknown"')
+          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME")
+          if [ -z "$WORKLOAD_ID" ]; then
+            echo "Could not find workload workspace: ${WORKLOAD_NAME}"
+            exit 1
+          fi
 
           echo "Bootstrap: ${BOOTSTRAP_NAME} (${BOOTSTRAP_ID})"
           echo "Workload:  ${WORKLOAD_NAME} (${WORKLOAD_ID})"
