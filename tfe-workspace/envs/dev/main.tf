@@ -70,7 +70,7 @@ module "storage_buckets" {
     workload = {
       name               = "bootstrap-prj-500323-tfe-dev-workload-2"
       location           = "US"
-      force_destroy      = false
+      force_destroy      = true
       versioning_enabled = true
     }
   }
