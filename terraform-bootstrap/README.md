@@ -3,7 +3,7 @@
 Bootstrap is split into environment roots and a shared module:
 
 ```text
-terraform-bootstrap/
+terraform-bootstrap/ 
   envs/
     dev/
     prod/
