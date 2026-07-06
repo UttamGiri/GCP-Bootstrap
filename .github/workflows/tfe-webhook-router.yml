@@ -5,7 +5,7 @@ name: TFE Webhook Router
 #
 # GitHub secret: TFE_TOKEN (optional — used to verify run_id succeeded before routing)
 #
-# TFE notification -> bridge/tfe-github-bridge Cloud Function (GCP-Bootstrap) -> POST:
+# Wire your webhook bridge to POST:
 #   POST https://api.github.com/repos/UttamGiri/GCP-Bootstrap/dispatches
 #   Authorization: Bearer <GITHUB_PAT with Actions + Contents>
 #

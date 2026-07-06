@@ -13,4 +13,3 @@ crash.log
 *.jpeg
 *.jpg
 *.png
-bridge/tfe-github-bridge/.build/
