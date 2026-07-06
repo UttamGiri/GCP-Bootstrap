@@ -75,9 +75,9 @@ upsert_env_var() {
 copy_bootstrap_auth() {
   local bootstrap_id="$1" workload_id="$2" sa wif
   sa=$(read_env_var "$bootstrap_id" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
-  [ -z "$sa" ] && sa=$(read_output "$bootstrap_id" "bootstrap_service_account_email")
+  [ -z "$sa" ] && sa=$(read_output "$bootstrap_id" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
   wif=$(read_env_var "$bootstrap_id" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
-  [ -z "$wif" ] && wif=$(read_output "$bootstrap_id" "tfe_workload_identity_provider")
+  [ -z "$wif" ] && wif=$(read_output "$bootstrap_id" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
   upsert_env_var "$workload_id" "TFC_GCP_PROVIDER_AUTH" "true"
   upsert_env_var "$workload_id" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
   upsert_env_var "$workload_id" "TFC_GCP_AUTH_IDENTITY" "bootstrap"

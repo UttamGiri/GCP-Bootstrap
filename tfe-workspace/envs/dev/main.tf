@@ -22,9 +22,7 @@ data "terraform_remote_state" "bootstrap" {
 }
 
 locals {
-  project_id                      = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
-  bootstrap_service_account_email = data.terraform_remote_state.bootstrap.outputs.bootstrap_service_account_email
-  tfe_workload_identity_provider  = data.terraform_remote_state.bootstrap.outputs.tfe_workload_identity_provider
+  project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
 }
 
 provider "google" {
