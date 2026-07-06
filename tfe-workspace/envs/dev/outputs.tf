@@ -8,12 +8,12 @@
 #     e.g. projects/1071237146360/locations/global/workloadIdentityPools/tfe-workspace-pool/providers/tfe-workspace-provider
 
 output "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" {
-  description = "Workload own SA — synced to workspace env var by tfe-sync-workload-auth after apply"
+  description = "Default provider instance"
   value       = module.workspace_identity.service_account_email
 }
 
 output "TFC_GCP_WORKLOAD_PROVIDER_NAME" {
-  description = "Workload own WIF provider — synced to workspace env var by tfe-sync-workload-auth after apply"
+  description = "Default provider instance"
   value       = module.workspace_identity.workload_identity_provider
 }
 

@@ -108,9 +108,9 @@ jobs:
           echo "Workload:  ${WORKLOAD_NAME} (${WORKLOAD_ID})"
 
           SA_EMAIL=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "bootstrap_service_account_email")
+            "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
           WIF_PROVIDER=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_WORKLOAD_PROVIDER_NAME" "tfe_workload_identity_provider")
+            "TFC_GCP_WORKLOAD_PROVIDER_NAME" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
 
           if [ -z "$SA_EMAIL" ] || [ "$SA_EMAIL" = "null" ]; then
             echo "FAIL: bootstrap SA email missing"
