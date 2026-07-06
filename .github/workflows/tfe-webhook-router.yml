@@ -1,0 +1,139 @@
+name: TFE Webhook Router
+
+# Single webhook entry point for TFE run:completed notifications (via a bridge).
+# Routes by repository_dispatch event type to the auth sync workflows.
+#
+# GitHub secret: TFE_TOKEN (optional — used to verify run_id succeeded before routing)
+#
+# TFE notification -> bridge/tfe-github-bridge Cloud Function (GCP-Bootstrap) -> POST:
+#   POST https://api.github.com/repos/UttamGiri/GCP-Bootstrap/dispatches
+#   Authorization: Bearer <GITHUB_PAT with Actions + Contents>
+#
+# After apply (resources created):
+#   {"event_type":"tfe-workload-applied","client_payload":{"run_id":"<TFE run id>"}}
+#
+# After destroy (resources destroyed):
+#   {"event_type":"tfe-workload-destroyed","client_payload":{"run_id":"<TFE run id>"}}
+#
+# Manual test: Actions -> TFE Webhook Router -> Run workflow
+
+on:
+  repository_dispatch:
+    types:
+      - tfe-workload-applied
+      - tfe-workload-created
+      - tfe-workload-destroyed
+
+  workflow_dispatch:
+    inputs:
+      event_type:
+        description: Webhook event type to simulate
+        required: true
+        type: choice
+        options:
+          - tfe-workload-applied
+          - tfe-workload-created
+          - tfe-workload-destroyed
+      run_id:
+        description: Optional TFE run ID (from webhook payload)
+        required: false
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  route:
+    name: Route TFE webhook event
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve event type
+        id: event
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "type=${{ github.event.action }}" >> "$GITHUB_OUTPUT"
+            run_id="${{ github.event.client_payload.run_id }}"
+          else
+            echo "type=${{ inputs.event_type }}" >> "$GITHUB_OUTPUT"
+            run_id="${{ inputs.run_id }}"
+          fi
+          echo "run_id=${run_id:-}" >> "$GITHUB_OUTPUT"
+          echo "Event: $(grep '^type=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
+          [ -n "${run_id:-}" ] && echo "TFE run: ${run_id}"
+
+      - name: Verify TFE run completed successfully
+        if: steps.event.outputs.run_id != ''
+        env:
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+          TFE_RUN_ID: ${{ steps.event.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TFE_TOKEN:-}" ]; then
+            echo "TFE_TOKEN not set — skipping run verification"
+            exit 0
+          fi
+
+          API="https://app.terraform.io/api/v2"
+          run_json=$(curl -sS \
+            --header "Authorization: Bearer ${TFE_TOKEN}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "${API}/runs/${TFE_RUN_ID}")
+
+          status=$(echo "$run_json" | jq -r '.data.attributes.status // empty')
+          is_destroy=$(echo "$run_json" | jq -r '.data.attributes["is-destroy"] // false')
+          echo "TFE run ${TFE_RUN_ID}: status=${status} is_destroy=${is_destroy}"
+
+          if [ "$status" != "applied" ] && [ "$status" != "planned_and_finished" ]; then
+            echo "FAIL: run did not succeed (status=${status})"
+            exit 1
+          fi
+
+          event_type="${{ steps.event.outputs.type }}"
+          case "$event_type" in
+            tfe-workload-applied|tfe-workload-created)
+              if [ "$is_destroy" = "true" ]; then
+                echo "FAIL: expected apply run, got destroy"
+                exit 1
+              fi
+              ;;
+            tfe-workload-destroyed)
+              if [ "$is_destroy" != "true" ]; then
+                echo "FAIL: expected destroy run, got apply"
+                exit 1
+              fi
+              ;;
+          esac
+
+      - name: Trigger TFE Sync Workload Auth
+        if: contains(fromJSON('["tfe-workload-applied","tfe-workload-created"]'), steps.event.outputs.type)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.payload.repository?.default_branch || 'main';
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'tfe-sync-workload-auth.yml',
+              ref,
+              inputs: {
+                run_id: '${{ steps.event.outputs.run_id }}',
+              },
+            });
+            core.info(`Triggered tfe-sync-workload-auth.yml on ${ref}`);
+
+      - name: Trigger TFE Copy Bootstrap Auth
+        if: steps.event.outputs.type == 'tfe-workload-destroyed'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.payload.repository?.default_branch || 'main';
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'tfe-copy-bootstrap-auth.yml',
+              ref,
+              inputs: {},
+            });
+            core.info(`Triggered tfe-copy-bootstrap-auth.yml on ${ref}`);

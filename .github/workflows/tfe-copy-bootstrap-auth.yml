@@ -1,10 +1,9 @@
 name: TFE Copy Bootstrap Auth
 
-# After destroy: run manually or wire your TFE notification webhook to trigger this.
-# After apply:  run manually or wire your TFE notification webhook to trigger sync workflow.
+# After destroy: copies GCP-Bootstrap auth env vars to GCP-tfe-workspace.
 #
 # GitHub secret: TFE_TOKEN
-# Manual: Actions -> TFE Copy Bootstrap Auth -> Run workflow
+# Triggered by: TFE Webhook Router (tfe-workload-destroyed) or manual Run workflow
 
 on:
   workflow_dispatch:

@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -93,4 +97,14 @@ moved {
 moved {
   from = google_service_account_iam_member.tfe_oidc_impersonation
   to   = module.bootstrap.google_service_account_iam_member.tfe_oidc_impersonation["ws-D2eEpkBSCE55LBq9"]
+}
+
+module "tfe_github_bridge" {
+  count  = var.enable_tfe_github_bridge ? 1 : 0
+  source = "../../../bridge/tfe-github-bridge"
+
+  project_id           = module.bootstrap.bootstrap_project_id
+  github_pat           = var.bridge_github_pat
+  tfe_token            = var.bridge_tfe_token
+  tfe_webhook_secret   = var.bridge_tfe_webhook_secret
 }

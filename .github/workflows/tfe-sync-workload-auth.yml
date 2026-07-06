@@ -4,23 +4,16 @@ name: TFE Sync Workload Auth
 # the same workspace env vars (workload own SA + WIF for self-run auth).
 #
 # GitHub secret: TFE_TOKEN
-#
-# Trigger options:
-#   1. workflow_dispatch — Actions -> Run workflow
-#   2. repository_dispatch — wire your TFE notification webhook to POST:
-#        POST https://api.github.com/repos/UttamGiri/GCP-Bootstrap/dispatches
-#        Authorization: Bearer <GITHUB_PAT>
-#        {"event_type":"tfe-workload-applied","client_payload":{"run_id":"<optional>"}}
-#
-# TFE notification (manual): GCP-tfe-workspace -> Settings -> Notifications
-#   Event: run:completed (apply only, not destroy) -> your webhook -> GitHub dispatch above
+# Triggered by: TFE Webhook Router (tfe-workload-applied) or manual Run workflow
 
 on:
-  repository_dispatch:
-    types:
-      - tfe-workload-applied
-
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: Optional TFE run ID (from webhook)
+        required: false
+        type: string
+        default: ""
 
 jobs:
   sync-workload-auth:
@@ -33,7 +26,7 @@ jobs:
       - name: Read outputs and replace workspace TFC_GCP env vars
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
-          TFE_RUN_ID: ${{ github.event.client_payload.run_id }}
+          TFE_RUN_ID: ${{ inputs.run_id }}
         run: |
           set -euo pipefail
 
