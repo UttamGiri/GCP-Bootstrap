@@ -37,7 +37,7 @@ module "workspace_identity" {
   project_id   = local.project_id
   workspace_id = "ws-2UNjJ7BXhV5ZnrAG"
 
-  service_account_id           = "gcp-tfe-workspace-sa"
+  service_account_id           = "gcp-tfe-workspace-sa-4"
   service_account_display_name = "GCP TFE Workspace Service Account"
 
   service_account_roles = [
@@ -49,9 +49,9 @@ module "workspace_identity" {
     "roles/iam.workloadIdentityPoolAdmin",
   ]
 
-  workload_identity_pool_id              = "tfe-workspace-pool"
+  workload_identity_pool_id              = "tfe-workspace-pool-4"
   workload_identity_pool_display_name    = "GCP TFE Workspace"
-  workload_identity_provider_id          = "tfe-workspace-provider"
+  workload_identity_provider_id          = "tfe-workspace-provider-4"
   workload_identity_provider_display_name = "GCP TFE Provider"
 }
 
@@ -68,7 +68,7 @@ module "storage_buckets" {
 
   buckets = {
     workload = {
-      name               = "bootstrap-prj-500323-tfe-dev-workload-2"
+      name               = "bootstrap-prj-500323-tfe-dev-workload-4"
       location           = "US"
       force_destroy      = true
       versioning_enabled = true
