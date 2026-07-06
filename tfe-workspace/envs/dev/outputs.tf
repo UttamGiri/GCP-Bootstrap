@@ -1,3 +1,20 @@
+# Workload self-run auth — same names/values as TFE workspace env vars after apply.
+#
+#   TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL
+#     e.g. gcp-tfe-workspace-sa@bootstrap-prj-500323.iam.gserviceaccount.com
+#   TFC_GCP_WORKLOAD_PROVIDER_NAME
+#     e.g. projects/1071237146360/locations/global/workloadIdentityPools/tfe-workspace-pool/providers/tfe-workspace-provider
+
+output "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" {
+  description = "Workload SA email — set as workspace env TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL for self-run auth"
+  value       = module.workspace_identity.service_account_email
+}
+
+output "TFC_GCP_WORKLOAD_PROVIDER_NAME" {
+  description = "Workload WIF provider — set as workspace env TFC_GCP_WORKLOAD_PROVIDER_NAME for self-run auth"
+  value       = module.workspace_identity.workload_identity_provider
+}
+
 output "bucket_names" {
   description = "Created GCS bucket names"
   value       = module.storage_buckets.bucket_names
@@ -8,12 +25,13 @@ output "bucket_urls" {
   value       = module.storage_buckets.bucket_urls
 }
 
+# Aliases (docs / older scripts)
 output "workspace_service_account_email" {
-  description = "Service account for consecutive GCP-tfe-workspace runs"
+  description = "Alias of TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL"
   value       = module.workspace_identity.service_account_email
 }
 
 output "workspace_workload_identity_provider" {
-  description = "WIF provider for consecutive GCP-tfe-workspace runs"
+  description = "Alias of TFC_GCP_WORKLOAD_PROVIDER_NAME"
   value       = module.workspace_identity.workload_identity_provider
 }
