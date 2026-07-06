@@ -1,31 +1,44 @@
-name: TFE Copy Bootstrap Auth
+name: TFE Sync Workload Auth
 
-# After destroy: run manually or wire your TFE notification webhook to trigger this.
-# After apply:  run manually or wire your TFE notification webhook to trigger sync workflow.
+# Reads TFC_GCP_* Terraform OUTPUTS from GCP-tfe-workspace state and replaces
+# the same workspace env vars (workload own SA + WIF for self-run auth).
 #
 # GitHub secret: TFE_TOKEN
-# Manual: Actions -> TFE Copy Bootstrap Auth -> Run workflow
+#
+# Trigger options:
+#   1. workflow_dispatch — Actions -> Run workflow
+#   2. repository_dispatch — wire your TFE notification webhook to POST:
+#        POST https://api.github.com/repos/UttamGiri/GCP-Bootstrap/dispatches
+#        Authorization: Bearer <GITHUB_PAT>
+#        {"event_type":"tfe-workload-applied","client_payload":{"run_id":"<optional>"}}
+#
+# TFE notification (manual): GCP-tfe-workspace -> Settings -> Notifications
+#   Event: run:completed (apply only, not destroy) -> your webhook -> GitHub dispatch above
 
 on:
+  repository_dispatch:
+    types:
+      - tfe-workload-applied
+
   workflow_dispatch:
 
 jobs:
-  copy-bootstrap-auth:
-    name: GCP-Bootstrap → GCP-tfe-workspace
+  sync-workload-auth:
+    name: Outputs -> GCP-tfe-workspace env vars
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
-      - name: Copy TFC_GCP auth variables
+      - name: Read outputs and replace workspace TFC_GCP env vars
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+          TFE_RUN_ID: ${{ github.event.client_payload.run_id }}
         run: |
           set -euo pipefail
 
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
-          BOOTSTRAP_NAME="GCP-Bootstrap"
           WORKLOAD_NAME="GCP-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
@@ -40,14 +53,6 @@ jobs:
             curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
               "${API}/organizations/${TFE_ORG}/workspaces/$1" \
               | jq -r '.data.id // empty'
-          }
-
-          read_env_var() {
-            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/workspaces/$1/vars?page%5Bsize%5D=100" \
-              | jq -r --arg k "$2" '
-                  [.data[]? | select(.attributes.key == $k and .attributes.category == "env")][0].attributes.value // empty
-                '
           }
 
           read_output() {
@@ -79,57 +84,46 @@ jobs:
                 }')" \
                 "${API}/workspaces/${ws_id}/vars" >/dev/null
             fi
-            echo "  set ${key}"
+            echo "  replaced ${key} on ${WORKLOAD_NAME}"
           }
-
-          resolve_auth_value() {
-            local ws_id="$1" env_key="$2" output_key="$3" value
-            value=$(read_env_var "$ws_id" "$env_key")
-            if [ -z "$value" ] || [ "$value" = "null" ]; then
-              value=$(read_output "$ws_id" "$output_key")
-            fi
-            printf '%s' "$value"
-          }
-
-          echo "=== Copy bootstrap auth to workload ==="
-
-          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME")
-          if [ -z "$BOOTSTRAP_ID" ]; then
-            echo "Could not find ${BOOTSTRAP_NAME}"
-            exit 1
-          fi
 
           WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME")
           if [ -z "$WORKLOAD_ID" ]; then
-            echo "Could not find workload workspace: ${WORKLOAD_NAME}"
+            echo "Could not find ${WORKLOAD_NAME}"
             exit 1
           fi
 
-          echo "Bootstrap: ${BOOTSTRAP_NAME} (${BOOTSTRAP_ID})"
-          echo "Workload:  ${WORKLOAD_NAME} (${WORKLOAD_ID})"
+          echo "=== Sync: Terraform outputs -> workspace env vars ==="
+          echo "Workspace: ${WORKLOAD_NAME} (${WORKLOAD_ID})"
+          [ -n "${TFE_RUN_ID:-}" ] && echo "Webhook run: ${TFE_RUN_ID}"
+          echo ""
+          echo "Reading outputs from state..."
 
-          SA_EMAIL=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "bootstrap_service_account_email")
-          WIF_PROVIDER=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_WORKLOAD_PROVIDER_NAME" "tfe_workload_identity_provider")
+          SA="" WIF=""
+          for attempt in $(seq 1 12); do
+            SA=$(read_output "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
+            WIF=$(read_output "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
+            if [ -n "$SA" ] && [ "$SA" != "null" ] && [ -n "$WIF" ] && [ "$WIF" != "null" ]; then
+              echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA}"
+              echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF}"
+              break
+            fi
+            echo "  attempt ${attempt}/12: outputs not in state yet..."
+            sleep 10
+          done
 
-          if [ -z "$SA_EMAIL" ] || [ "$SA_EMAIL" = "null" ]; then
-            echo "FAIL: bootstrap SA email missing"
+          if [ -z "$SA" ] || [ -z "$WIF" ]; then
+            echo "FAIL: apply must finish first — outputs TFC_GCP_* missing"
             exit 1
           fi
-          if [ -z "$WIF_PROVIDER" ] || [ "$WIF_PROVIDER" = "null" ]; then
-            echo "FAIL: bootstrap WIF provider missing"
-            exit 1
-          fi
-
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_AUTH_IDENTITY" "bootstrap"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$SA_EMAIL"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$WIF_PROVIDER"
 
           echo ""
-          echo "Done:"
-          echo "  TFC_GCP_AUTH_IDENTITY=bootstrap"
-          echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}"
-          echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
+          echo "Replacing env vars on ${WORKLOAD_NAME}..."
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_AUTH_IDENTITY" "workload"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$SA"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$WIF"
+
+          echo ""
+          echo "Done — next run uses workload own identity (from outputs)."

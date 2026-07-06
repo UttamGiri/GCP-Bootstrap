@@ -1,4 +1,6 @@
-# Workload self-run auth — same names/values as TFE workspace env vars after apply.
+# First run uses bootstrap env vars (bs-tfe-sa). After apply, run GitHub Action
+# "TFE Sync Workload Auth" (manually or via TFE notification webhook) to copy
+# these outputs into workspace env vars for self-run auth.
 #
 #   TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL
 #     e.g. gcp-tfe-workspace-sa@bootstrap-prj-500323.iam.gserviceaccount.com
@@ -6,12 +8,12 @@
 #     e.g. projects/1071237146360/locations/global/workloadIdentityPools/tfe-workspace-pool/providers/tfe-workspace-provider
 
 output "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" {
-  description = "Workload SA email — set as workspace env TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL for self-run auth"
+  description = "Workload own SA — synced to workspace env var by tfe-sync-workload-auth after apply"
   value       = module.workspace_identity.service_account_email
 }
 
 output "TFC_GCP_WORKLOAD_PROVIDER_NAME" {
-  description = "Workload WIF provider — set as workspace env TFC_GCP_WORKLOAD_PROVIDER_NAME for self-run auth"
+  description = "Workload own WIF provider — synced to workspace env var by tfe-sync-workload-auth after apply"
   value       = module.workspace_identity.workload_identity_provider
 }
 
@@ -23,15 +25,4 @@ output "bucket_names" {
 output "bucket_urls" {
   description = "Created GCS bucket URLs"
   value       = module.storage_buckets.bucket_urls
-}
-
-# Aliases (docs / older scripts)
-output "workspace_service_account_email" {
-  description = "Alias of TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL"
-  value       = module.workspace_identity.service_account_email
-}
-
-output "workspace_workload_identity_provider" {
-  description = "Alias of TFC_GCP_WORKLOAD_PROVIDER_NAME"
-  value       = module.workspace_identity.workload_identity_provider
 }
