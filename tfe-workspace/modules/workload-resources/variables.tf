@@ -6,6 +6,10 @@ variable "resource_suffix" {
   type = string
 }
 
+variable "bucket_suffix" {
+  type = string
+}
+
 variable "environment" {
   type = string
 }

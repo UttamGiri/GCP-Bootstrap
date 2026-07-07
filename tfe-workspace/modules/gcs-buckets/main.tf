@@ -29,6 +29,10 @@ resource "google_storage_bucket" "buckets" {
   force_destroy               = each.value.force_destroy
   labels                      = merge(var.common_labels, each.value.labels)
 
+  soft_delete_policy {
+    retention_duration_seconds = 0
+  }
+
   versioning {
     enabled = each.value.versioning_enabled
   }

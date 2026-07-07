@@ -30,6 +30,7 @@ module "workload_resources" {
 
   project_id      = var.project_id
   resource_suffix = var.resource_suffix
+  bucket_suffix   = var.bucket_suffix
   environment     = var.environment
 
   depends_on = [module.workspace_identity]

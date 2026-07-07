@@ -9,7 +9,12 @@ variable "workspace_id" {
 }
 
 variable "resource_suffix" {
-  description = "Suffix for SA/WIF/bucket names; bumped after each destroy"
+  description = "Suffix for SA/WIF names; bumped after each identity destroy"
+  type        = string
+}
+
+variable "bucket_suffix" {
+  description = "Fixed suffix for bucket names; not bumped on destroy"
   type        = string
 }
 
