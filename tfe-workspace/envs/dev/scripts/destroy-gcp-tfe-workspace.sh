@@ -155,8 +155,8 @@ if [ "$resource_count" = "0" ]; then
   exit 0
 fi
 
-echo "Syncing workload auth before destroy (SA deletes itself last)..."
-sync_workload_auth "$WORKLOAD_ID"
+echo "Switching to bootstrap auth before destroy (reliable for UI and script)..."
+copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
 echo "Waiting for TFE to pick up env vars on the destroy run..."
 sleep 10
 
