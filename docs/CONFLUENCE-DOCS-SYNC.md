@@ -2,10 +2,10 @@
 
 Markdown under `docs/` can be published to Confluence automatically via GitHub Actions. Edit locally in git; Confluence receives updates on push or manual run.
 
-## How it works
+## How it works 
 
 ```mermaid
-flowchart LR
+flowchart LR broken
   A[Edit docs/*.md] --> B[Push to GitHub]
   B --> C[Confluence Docs Sync workflow]
   C --> D[Read page-mapping.json]
