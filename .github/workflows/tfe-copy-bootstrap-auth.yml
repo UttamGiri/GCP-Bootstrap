@@ -8,17 +8,6 @@ name: TFE Copy Bootstrap Auth
 
 on:
   workflow_dispatch:
-    inputs:
-      skip_suffix_bump:
-        description: Skip incrementing resource_suffix in dev main.tf
-        required: false
-        type: boolean
-        default: false
-      force_suffix_bump:
-        description: Bump suffix even if managed resources remain in state
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -150,10 +139,8 @@ jobs:
           echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
 
       - name: Bump dev resource suffix
-        if: inputs.skip_suffix_bump != true
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
-          FORCE_SUFFIX_BUMP: ${{ inputs.force_suffix_bump }}
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
@@ -161,7 +148,7 @@ jobs:
           API="https://app.terraform.io/api/v2"
 
           if [ -z "${TFE_TOKEN:-}" ]; then
-            echo "Missing secret TFE_TOKEN — cannot verify destroy completed"
+            echo "Missing secret TFE_TOKEN — cannot read workspace state"
             exit 1
           fi
 
@@ -174,37 +161,31 @@ jobs:
             exit 1
           fi
 
-          WS_JSON=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+          SV_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
             --header "Content-Type: application/vnd.api+json" \
-            "${API}/workspaces/${WORKLOAD_ID}")
-          RESOURCE_COUNT=$(echo "$WS_JSON" | jq -r '.data.attributes["resource-count"] // -1')
-          SV_ID=$(echo "$WS_JSON" | jq -r '.data.relationships["current-state-version"].data.id // empty')
-
-          MANAGED_COUNT=-1
-          if [ -n "$SV_ID" ]; then
-            STATE_URL=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
-              --header "Content-Type: application/vnd.api+json" \
-              "${API}/state-versions/${SV_ID}" \
-              | jq -r '.data.attributes["hosted-state-download-url"] // empty')
-            if [ -n "$STATE_URL" ]; then
-              MANAGED_COUNT=$(curl -sS "$STATE_URL" \
-                | jq '[.resources[]? | select(.mode == "managed")] | length')
-            fi
-          fi
-
-          echo "workspace resource-count attribute: ${RESOURCE_COUNT}"
-          echo "managed resources in state file: ${MANAGED_COUNT}"
-
-          if [ "$MANAGED_COUNT" != "0" ] && [ "${FORCE_SUFFIX_BUMP}" != "true" ]; then
-            echo "SKIP: ${MANAGED_COUNT} managed resource(s) still in state — run destroy first or re-run with force_suffix_bump=true"
+            "${API}/workspaces/${WORKLOAD_ID}" \
+            | jq -r '.data.relationships["current-state-version"].data.id // empty')
+          if [ -z "$SV_ID" ]; then
+            echo "SKIP: no state version — bump when destroy leaves empty state"
             exit 0
           fi
-          if [ "$MANAGED_COUNT" = "-1" ]; then
-            echo "WARN: could not read state file; using workspace resource-count=${RESOURCE_COUNT}"
-            if [ "$RESOURCE_COUNT" != "0" ] && [ "${FORCE_SUFFIX_BUMP}" != "true" ]; then
-              echo "SKIP: resource_count=${RESOURCE_COUNT} — bump only after destroy (count must be 0)"
-              exit 0
-            fi
+
+          STATE_URL=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "${API}/state-versions/${SV_ID}" \
+            | jq -r '.data.attributes["hosted-state-download-url"] // empty')
+          if [ -z "$STATE_URL" ]; then
+            echo "FAIL: could not get state download URL"
+            exit 1
+          fi
+
+          MANAGED_COUNT=$(curl -sS "$STATE_URL" \
+            | jq '[.resources[]? | select(.mode == "managed")] | length')
+          echo "managed resources in state: ${MANAGED_COUNT}"
+
+          if [ "$MANAGED_COUNT" != "0" ]; then
+            echo "SKIP: state not empty (${MANAGED_COUNT} managed) — run destroy first"
+            exit 0
           fi
 
           CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
@@ -224,7 +205,6 @@ jobs:
           echo "  bootstrap-prj-500323-tfe-dev-workload-${NEXT}"
 
       - name: Commit and push suffix bump
-        if: inputs.skip_suffix_bump != true
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
