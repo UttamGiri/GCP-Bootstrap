@@ -194,7 +194,7 @@ Disable or delete the TFE notification (or set **No events**). After each succes
 | Apply succeeded | `tfe-workload-applied` |
 | Destroy succeeded | `tfe-workload-destroyed` |
 
-Or run **TFE Sync Workload Auth** / **TFE Copy Bootstrap Auth** directly.
+Or run **TFE Sync Workload Auth** / **Bump Bootstrap Auth** directly.
 
 ---
 

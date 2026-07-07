@@ -1,7 +1,7 @@
 name: TFE Switch Bootstrap Auth
 
 # Run BEFORE destroy in TFE UI if not using destroy-gcp-tfe-workspace.sh.
-# Copies bootstrap auth only — no resource_suffix bump (use TFE Copy Bootstrap Auth after destroy).
+# Copies bootstrap auth only — no resource_suffix bump (use Bump Bootstrap Auth after destroy).
 #
 # GitHub secret: TFE_TOKEN
 

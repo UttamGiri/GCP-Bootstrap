@@ -1,10 +1,10 @@
-name: TFE Copy Bootstrap Auth
+name: Bump Bootstrap Auth
 
 # After destroy: copies GCP-Bootstrap auth env vars to GCP-tfe-workspace and
 # bumps dev resource_suffix (+1) so the next apply avoids IAM/WIF 409 conflicts.
 #
 # GitHub secret: TFE_TOKEN
-# Triggered by: TFE Webhook Router (tfe-workload-destroyed) or manual Run workflow
+# Triggered manually via Run workflow
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 jobs:
-  copy-bootstrap-auth:
+  bump-bootstrap-auth:
     name: GCP-Bootstrap → GCP-tfe-workspace
     runs-on: ubuntu-latest
 

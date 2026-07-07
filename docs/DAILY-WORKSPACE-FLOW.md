@@ -162,7 +162,7 @@ Daily destroy should remove only workload resources that are safe to recreate.
 
 **Before destroy:** env vars must match state outputs (`TFC_GCP_*` for the current suffix). The destroy script syncs workload auth automatically; for TFE UI destroy, run **TFE Sync Workload Auth** first.
 
-**After destroy:** run **TFE Switch Bootstrap Auth** then **TFE Copy Bootstrap Auth** (bumps `resource_suffix` when state is empty).
+**After destroy:** run **TFE Switch Bootstrap Auth** then **Bump Bootstrap Auth** (bumps `resource_suffix` when state is empty).
 
 **Adding new resources:** add them in `modules/workload-resources/` only. Do not add sibling modules to `workload-stack/` — that file has the single `depends_on` that protects destroy order.
 
@@ -206,7 +206,7 @@ Destroy behavior differs by resource type. Do not assume bucket timing applies t
 
 **Practical dev rule:** destroy buckets freely; keep workload SA + WIF pool across daily cycles, or bump the suffix after a full identity destroy.
 
-After destroy, run the **TFE Copy Bootstrap Auth** GitHub Actions workflow — it resets bootstrap auth env vars and auto-increments `resource_suffix` in `tfe-workspace/envs/dev/main.tf` (+1 per run).
+After destroy, run the **Bump Bootstrap Auth** GitHub Actions workflow — it resets bootstrap auth env vars and auto-increments `resource_suffix` in `tfe-workspace/envs/dev/main.tf` (+1 per run).
 
 ---
 
