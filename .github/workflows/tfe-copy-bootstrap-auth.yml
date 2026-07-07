@@ -14,6 +14,11 @@ on:
         required: false
         type: boolean
         default: false
+      force_suffix_bump:
+        description: Bump suffix even if managed resources remain in state
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -148,6 +153,7 @@ jobs:
         if: inputs.skip_suffix_bump != true
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+          FORCE_SUFFIX_BUMP: ${{ inputs.force_suffix_bump }}
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
@@ -168,13 +174,37 @@ jobs:
             exit 1
           fi
 
-          RESOURCE_COUNT=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+          WS_JSON=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
             --header "Content-Type: application/vnd.api+json" \
-            "${API}/workspaces/${WORKLOAD_ID}" \
-            | jq -r '.data.attributes["resource-count"] // -1')
-          if [ "$RESOURCE_COUNT" != "0" ]; then
-            echo "SKIP: resource_count=${RESOURCE_COUNT} — bump only after a successful destroy (count must be 0)"
+            "${API}/workspaces/${WORKLOAD_ID}")
+          RESOURCE_COUNT=$(echo "$WS_JSON" | jq -r '.data.attributes["resource-count"] // -1')
+          SV_ID=$(echo "$WS_JSON" | jq -r '.data.relationships["current-state-version"].data.id // empty')
+
+          MANAGED_COUNT=-1
+          if [ -n "$SV_ID" ]; then
+            STATE_URL=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+              --header "Content-Type: application/vnd.api+json" \
+              "${API}/state-versions/${SV_ID}" \
+              | jq -r '.data.attributes["hosted-state-download-url"] // empty')
+            if [ -n "$STATE_URL" ]; then
+              MANAGED_COUNT=$(curl -sS "$STATE_URL" \
+                | jq '[.resources[]? | select(.mode == "managed")] | length')
+            fi
+          fi
+
+          echo "workspace resource-count attribute: ${RESOURCE_COUNT}"
+          echo "managed resources in state file: ${MANAGED_COUNT}"
+
+          if [ "$MANAGED_COUNT" != "0" ] && [ "${FORCE_SUFFIX_BUMP}" != "true" ]; then
+            echo "SKIP: ${MANAGED_COUNT} managed resource(s) still in state — run destroy first or re-run with force_suffix_bump=true"
             exit 0
+          fi
+          if [ "$MANAGED_COUNT" = "-1" ]; then
+            echo "WARN: could not read state file; using workspace resource-count=${RESOURCE_COUNT}"
+            if [ "$RESOURCE_COUNT" != "0" ] && [ "${FORCE_SUFFIX_BUMP}" != "true" ]; then
+              echo "SKIP: resource_count=${RESOURCE_COUNT} — bump only after destroy (count must be 0)"
+              exit 0
+            fi
           fi
 
           CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
