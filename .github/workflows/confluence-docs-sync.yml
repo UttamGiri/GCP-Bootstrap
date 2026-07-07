@@ -9,7 +9,7 @@ name: Confluence Docs Sync
 #   CONFLUENCE_BASE_URL   https://vaflt.atlassian.net
 #   CONFLUENCE_EMAIL      uttamgiri32@gmail.com
 #
-# Configure page IDs in docs/confluence/page-mapping.json (dev and prod sections).
+# Configure page IDs in docs/confluence/page-mapping.json (dev section only for now).
 
 on:
   push:
@@ -24,13 +24,6 @@ on:
 
   workflow_dispatch:
     inputs:
-      environment:
-        description: Confluence target environment
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
       sync_all:
         description: Sync all mapped docs (ignore changed-files filter)
         required: false
@@ -39,7 +32,7 @@ on:
 
 jobs:
   sync:
-    name: Sync docs to Confluence (${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'prod' || 'dev') }})
+    name: Sync docs to Confluence (dev)
     runs-on: ubuntu-latest
     env:
       CONFLUENCE_BASE_URL: https://vaflt.atlassian.net
@@ -53,14 +46,7 @@ jobs:
 
       - name: Resolve environment
         id: cfg
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.ref_name }}" = "main" ]; then
-            echo "env=prod" >> "$GITHUB_OUTPUT"
-          else
-            echo "env=dev" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "env=dev" >> "$GITHUB_OUTPUT"
 
       - name: List changed markdown files
         id: files

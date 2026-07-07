@@ -61,15 +61,11 @@ Keys are **filenames** under `docs/` (not paths). Only `page_id` is required.
     "README.md": { "page_id": "753666" },
     "BOOTSTRAP-FLOW.md": { "page_id": "786524" },
     "CONFLUENCE-DOCS-SYNC.md": { "page_id": "REPLACE_WITH_PAGE_ID" }
-  },
-  "prod": {
-    "BOOTSTRAP-FLOW.md": { "page_id": "REPLACE_WITH_PROD_PAGE_ID" }
   }
 }
 ```
 
-- **`dev`** — used when pushing to `develop` or when you manually run the workflow with environment `dev`.
-- **`prod`** — used when pushing to `main` or manual run with `prod`. Add a `prod` section when you have production Confluence pages.
+All syncs use the **`dev`** section only (including pushes to `main`). Add a `prod` section later when you have separate production Confluence pages.
 
 ### 3. Add GitHub secret (API token)
 
@@ -101,17 +97,15 @@ To change site or account, edit `env` in `.github/workflows/confluence-docs-sync
 
 ### Automatic
 
-| Trigger | Environment | What syncs |
-|---------|-------------|------------|
-| Push to `develop` | `dev` | Changed `docs/*.md` files only |
-| Push to `main` | `prod` | Changed `docs/*.md` files only |
-| Change to `page-mapping.json` | same as branch | All mapped docs |
+| Trigger | What syncs |
+|---------|------------|
+| Push to `main` or `develop` | Changed `docs/*.md` files only |
+| Change to `page-mapping.json` | All mapped docs |
 
 ### Manual
 
 1. GitHub → **Actions** → **Confluence Docs Sync** → **Run workflow**.
-2. **environment:** `dev` (until `prod` mapping exists).
-3. **sync all:** `true` to push every mapped file.
+2. **sync all:** `true` to push every mapped file.
 
 ### Local test (optional)
 
@@ -126,7 +120,7 @@ python3 .github/scripts/sync-confluence.py --env dev --files BOOTSTRAP-FLOW.md
 
 1. Add `docs/MY-NEW-DOC.md`.
 2. Create a Confluence page (unique title) and copy its page ID.
-3. Add an entry to `docs/confluence/page-mapping.json` under `dev` and/or `prod`.
+3. Add an entry to `docs/confluence/page-mapping.json` under `dev`.
 4. Add a row to [docs/README.md](README.md).
 5. Commit and push (or run the workflow manually).
 
@@ -140,7 +134,6 @@ python3 .github/scripts/sync-confluence.py --env dev --files BOOTSTRAP-FLOW.md
 | `403 Forbidden` | No edit access | Use an account that can edit the target pages |
 | `404 Not found` | Wrong `page_id` | Re-copy ID from Confluence URL |
 | Page name must be unique | Duplicate title in space | Rename page in Confluence when creating; sync does not rename |
-| `Unknown environment 'prod'` | No `prod` in mapping | Add `prod` section to `page-mapping.json` or run with `dev` |
 | Workflow skips files | Placeholder `page_id` | Replace `REPLACE_WITH_*` with real IDs |
 
 ---
@@ -155,6 +148,6 @@ docs/
   TFE-WEBHOOK-GITHUB.md
   CONFLUENCE-DOCS-SYNC.md        # This guide
   confluence/
-    page-mapping.json            # dev/prod page IDs
+    page-mapping.json            # dev page IDs
     README.md                    # Short pointer to this doc
 ```
