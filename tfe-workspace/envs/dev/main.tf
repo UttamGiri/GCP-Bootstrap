@@ -24,7 +24,7 @@ data "terraform_remote_state" "bootstrap" {
 locals {
   project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
   # Incremented +1 by .github/workflows/tfe-copy-bootstrap-auth.yml after each destroy.
-  resource_suffix = "4"
+  resource_suffix = "5"
 }
 
 provider "google" {
