@@ -11,6 +11,10 @@ This repository uses bootstrap Terraform environment roots under `terraform-boot
 
 It also includes separate TFE workspace configurations under `tfe-workspace/envs/` for environments such as dev and prod. Those configurations currently create GCP storage buckets.
 
+## Documentation
+
+Flow guides and runbooks live in [docs/](docs/). They sync to Confluence via the **Confluence Docs Sync** GitHub Action — see [docs/confluence/README.md](docs/confluence/README.md) for page ID mapping.
+
 ## Intended operating model
 
 1. Run Terraform first from Google Cloud Shell with local state.

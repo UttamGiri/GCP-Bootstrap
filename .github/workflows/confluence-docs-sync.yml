@@ -1,0 +1,120 @@
+name: Confluence Docs Sync
+
+# Pushes docs/*.md changes to Confluence using docs/confluence/page-mapping.json.
+#
+# Required secret:
+#   CONFLUENCE_API_TOKEN  Atlassian API token
+#
+# Defaults (edit in workflow env if your site or account changes):
+#   CONFLUENCE_BASE_URL   https://vaflt.atlassian.net
+#   CONFLUENCE_EMAIL      uttamgiri32@gmail.com
+#
+# Configure page IDs in docs/confluence/page-mapping.json (dev and prod sections).
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'docs/*.md'
+      - 'docs/confluence/page-mapping.json'
+      - '.github/workflows/confluence-docs-sync.yml'
+      - '.github/scripts/sync-confluence.py'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Confluence target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      sync_all:
+        description: Sync all mapped docs (ignore changed-files filter)
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  sync:
+    name: Sync docs to Confluence (${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.ref_name == 'main' && 'prod' || 'dev') }})
+    runs-on: ubuntu-latest
+    env:
+      CONFLUENCE_BASE_URL: https://vaflt.atlassian.net
+      CONFLUENCE_EMAIL: uttamgiri32@gmail.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve environment
+        id: cfg
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "env=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: List changed markdown files
+        id: files
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.sync_all }}" = "true" ]; then
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            before="${{ github.event.before }}"
+            if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+              mapfile -t changed < <(find docs -maxdepth 1 -name '*.md' -printf '%f\n' | sort)
+            else
+              mapfile -t changed < <(git diff --name-only "$before" "${{ github.sha }}" -- docs/ | sed -n 's|^docs/||p' | grep '\.md$' || true)
+              if git diff --name-only "$before" "${{ github.sha }}" -- docs/confluence/page-mapping.json | grep -q .; then
+                echo "mode=all" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          else
+            mapfile -t changed < <(find docs -maxdepth 1 -name '*.md' -printf '%f\n' | sort)
+          fi
+
+          if [ "${#changed[@]}" -eq 0 ]; then
+            echo "No markdown changes under docs/"
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf '%s\n' "${changed[@]}"
+          {
+            echo "has_files=true"
+            echo "files<<EOF"
+            printf '%s\n' "${changed[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.files.outputs.has_files == 'true' || steps.files.outputs.mode == 'all'
+        run: pip install markdown
+
+      - name: Sync to Confluence
+        if: steps.files.outputs.has_files == 'true' || steps.files.outputs.mode == 'all'
+        env:
+          CONFLUENCE_API_TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          args=(--env "${{ steps.cfg.outputs.env }}")
+          if [ "${{ steps.files.outputs.mode }}" != "all" ]; then
+            args+=(--files)
+            while IFS= read -r file; do
+              [ -n "$file" ] && args+=("$file")
+            done <<< "${{ steps.files.outputs.files }}"
+          fi
+          python3 .github/scripts/sync-confluence.py "${args[@]}"
