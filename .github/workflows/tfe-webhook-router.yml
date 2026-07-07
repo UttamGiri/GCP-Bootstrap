@@ -83,12 +83,8 @@ jobs:
 
           status=$(echo "$run_json" | jq -r '.data.attributes.status // empty')
           is_destroy=$(echo "$run_json" | jq -r '.data.attributes["is-destroy"] // false')
+          ws_id=$(echo "$run_json" | jq -r '.data.relationships.workspace.data.id // empty')
           echo "TFE run ${TFE_RUN_ID}: status=${status} is_destroy=${is_destroy}"
-
-          if [ "$status" != "applied" ] && [ "$status" != "planned_and_finished" ]; then
-            echo "FAIL: run did not succeed (status=${status})"
-            exit 1
-          fi
 
           event_type="${{ steps.event.outputs.type }}"
           case "$event_type" in
@@ -97,10 +93,32 @@ jobs:
                 echo "FAIL: expected apply run, got destroy"
                 exit 1
               fi
+              if [ "$status" != "applied" ] && [ "$status" != "planned_and_finished" ]; then
+                echo "FAIL: apply run did not succeed (status=${status})"
+                exit 1
+              fi
               ;;
             tfe-workload-destroyed)
               if [ "$is_destroy" != "true" ]; then
                 echo "FAIL: expected destroy run, got apply"
+                exit 1
+              fi
+              if [ "$status" = "applied" ] || [ "$status" = "planned_and_finished" ]; then
+                echo "Destroy run succeeded"
+              elif [ "$status" = "errored" ] && [ -n "$ws_id" ]; then
+                resource_count=$(curl -sS \
+                  --header "Authorization: Bearer ${TFE_TOKEN}" \
+                  --header "Content-Type: application/vnd.api+json" \
+                  "${API}/workspaces/${ws_id}" \
+                  | jq -r '.data.attributes["resource-count"] // -1')
+                if [ "$resource_count" = "0" ]; then
+                  echo "Destroy run errored but state is empty (resource_count=0) — continuing"
+                else
+                  echo "FAIL: destroy errored with resource_count=${resource_count}"
+                  exit 1
+                fi
+              else
+                echo "FAIL: destroy run did not succeed (status=${status})"
                 exit 1
               fi
               ;;

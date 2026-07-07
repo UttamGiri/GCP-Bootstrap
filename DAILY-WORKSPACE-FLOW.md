@@ -175,6 +175,33 @@ If those identity resources are destroyed, the next run cannot authenticate with
 
 ---
 
+## GCS Bucket vs Service Account (Name Reuse After Delete)
+
+Destroy behavior differs by resource type. Do not assume bucket timing applies to service accounts or WIF pools.
+
+| | GCS bucket | Service account | WIF pool / provider |
+|--|------------|-----------------|---------------------|
+| Soft-delete window | 7 days (default) | 30 days | ~30 days |
+| Same name after delete | Usually **seconds** | **Blocked** while soft-deleted (409) | **Blocked** while soft-deleted (409) |
+| Hard purge | After retention | After 30 days | After soft-delete retention |
+| Same name = same identity? | No (new bucket) | No if recreated (new unique ID); **yes** if undeleted within 30 days | No if recreated; undelete if still in window |
+
+**GCS bucket notes:**
+
+- Soft delete keeps a recoverable copy for up to 7 days, but the **name** is usually free again in seconds.
+- `force_destroy = true` in Terraform only empties the bucket so destroy can succeed. It does **not** disable soft delete or force immediate hard delete.
+
+**Service account notes:**
+
+- Reusing `account_id` (for example `gcp-tfe-workspace-sa-4`) right after destroy typically returns `409 Already exists`.
+- Options: **do not destroy** the SA, **undelete** within 30 days, or **rotate a suffix** (`-4`, `-5`, …) in Terraform.
+
+**Practical dev rule:** destroy buckets freely; keep workload SA + WIF pool across daily cycles, or bump the suffix after a full identity destroy.
+
+After destroy, run the **TFE Copy Bootstrap Auth** GitHub Actions workflow — it resets bootstrap auth env vars and auto-increments `resource_suffix` in `tfe-workspace/envs/dev/main.tf` (+1 per run).
+
+---
+
 ## Important Limitation
 
 - TFE chooses `TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL` before Terraform starts.

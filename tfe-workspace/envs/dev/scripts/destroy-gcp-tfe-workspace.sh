@@ -120,9 +120,21 @@ resource_count=$(curl -sS --header "$(auth)" --header "Content-Type: application
   "${API}/workspaces/${WORKLOAD_ID}" | jq -r '.data.attributes["resource-count"] // 0')
 echo "Resource count: ${resource_count}"
 
+finish_destroy() {
+  local rc="$1"
+  echo "Done. Resource count: ${rc}"
+  echo "Copying bootstrap auth..."
+  copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
+  echo ""
+  echo "Next: run GitHub Actions workflow 'TFE Copy Bootstrap Auth' to bump resource_suffix (+1) and push main.tf."
+  exit 0
+}
+
 if [ "$resource_count" = "0" ]; then
   echo "State empty — copying bootstrap auth only."
   copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
+  echo ""
+  echo "Next: run GitHub Actions workflow 'TFE Copy Bootstrap Auth' to bump resource_suffix (+1) and push main.tf."
   exit 0
 fi
 
@@ -135,7 +147,7 @@ RUN_RESPONSE=$(curl -sS --header "$(auth)" --header "Content-Type: application/v
         message: "Destroy from local script",
         "is-destroy": true,
         "auto-apply": false,
-        refresh: true
+        refresh: false
       },
       relationships: { workspace: { data: { type: "workspaces", id: $ws } } }
     }
@@ -161,12 +173,20 @@ for i in $(seq 1 120); do
     applied|planned_and_finished)
       resource_count=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
         "${API}/workspaces/${WORKLOAD_ID}" | jq -r '.data.attributes["resource-count"] // 0')
-      echo "Done. Resource count: ${resource_count}"
-      echo "Copying bootstrap auth..."
-      copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
-      exit 0
+      finish_destroy "$resource_count"
       ;;
-    errored|canceled|discarded)
+    errored)
+      resource_count=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+        "${API}/workspaces/${WORKLOAD_ID}" | jq -r '.data.attributes["resource-count"] // 0')
+      if [ "$resource_count" = "0" ]; then
+        echo "Destroy errored but state is empty — treating as success."
+        finish_destroy "$resource_count"
+      fi
+      echo "Destroy failed: ${status} (resource_count=${resource_count})"
+      echo "If you see 'workspace is not locked' — discard other planned runs and retry this script once."
+      exit 1
+      ;;
+    canceled|discarded)
       echo "Destroy failed: ${status}"
       echo "If you see 'workspace is not locked' — discard other planned runs and retry this script once."
       exit 1

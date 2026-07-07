@@ -23,6 +23,8 @@ data "terraform_remote_state" "bootstrap" {
 
 locals {
   project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
+  # Incremented +1 by .github/workflows/tfe-copy-bootstrap-auth.yml after each destroy.
+  resource_suffix = "4"
 }
 
 provider "google" {
@@ -35,7 +37,7 @@ module "workspace_identity" {
   project_id   = local.project_id
   workspace_id = "ws-2UNjJ7BXhV5ZnrAG"
 
-  service_account_id           = "gcp-tfe-workspace-sa-4"
+  service_account_id           = "gcp-tfe-workspace-sa-${local.resource_suffix}"
   service_account_display_name = "GCP TFE Workspace Service Account"
 
   service_account_roles = [
@@ -47,9 +49,9 @@ module "workspace_identity" {
     "roles/iam.workloadIdentityPoolAdmin",
   ]
 
-  workload_identity_pool_id              = "tfe-workspace-pool-4"
+  workload_identity_pool_id              = "tfe-workspace-pool-${local.resource_suffix}"
   workload_identity_pool_display_name    = "GCP TFE Workspace"
-  workload_identity_provider_id          = "tfe-workspace-provider-4"
+  workload_identity_provider_id          = "tfe-workspace-provider-${local.resource_suffix}"
   workload_identity_provider_display_name = "GCP TFE Provider"
 }
 
@@ -66,7 +68,7 @@ module "storage_buckets" {
 
   buckets = {
     workload = {
-      name               = "bootstrap-prj-500323-tfe-dev-workload-4"
+      name               = "bootstrap-prj-500323-tfe-dev-workload-${local.resource_suffix}"
       location           = "US"
       force_destroy      = true
       versioning_enabled = true

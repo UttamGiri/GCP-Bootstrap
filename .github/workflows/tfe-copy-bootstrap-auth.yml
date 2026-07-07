@@ -1,21 +1,32 @@
 name: TFE Copy Bootstrap Auth
 
-# After destroy: copies GCP-Bootstrap auth env vars to GCP-tfe-workspace.
+# After destroy: copies GCP-Bootstrap auth env vars to GCP-tfe-workspace and
+# bumps dev resource_suffix (+1) so the next apply avoids IAM/WIF 409 conflicts.
 #
 # GitHub secret: TFE_TOKEN
 # Triggered by: TFE Webhook Router (tfe-workload-destroyed) or manual Run workflow
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_suffix_bump:
+        description: Skip incrementing resource_suffix in dev main.tf
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
 
 jobs:
   copy-bootstrap-auth:
     name: GCP-Bootstrap → GCP-tfe-workspace
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Copy TFC_GCP auth variables
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
@@ -132,3 +143,74 @@ jobs:
           echo "  TFC_GCP_AUTH_IDENTITY=bootstrap"
           echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}"
           echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
+
+      - name: Bump dev resource suffix
+        if: inputs.skip_suffix_bump != true
+        env:
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+        run: |
+          set -euo pipefail
+          MAIN_TF="tfe-workspace/envs/dev/main.tf"
+          WORKLOAD_NAME="GCP-tfe-workspace"
+          API="https://app.terraform.io/api/v2"
+
+          if [ -z "${TFE_TOKEN:-}" ]; then
+            echo "Missing secret TFE_TOKEN — cannot verify destroy completed"
+            exit 1
+          fi
+
+          WORKLOAD_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "${API}/organizations/vaflt-org/workspaces/${WORKLOAD_NAME}" \
+            | jq -r '.data.id // empty')
+          if [ -z "$WORKLOAD_ID" ]; then
+            echo "FAIL: workload workspace not found"
+            exit 1
+          fi
+
+          RESOURCE_COUNT=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+            --header "Content-Type: application/vnd.api+json" \
+            "${API}/workspaces/${WORKLOAD_ID}" \
+            | jq -r '.data.attributes["resource-count"] // -1')
+          if [ "$RESOURCE_COUNT" != "0" ]; then
+            echo "SKIP: resource_count=${RESOURCE_COUNT} — bump only after a successful destroy (count must be 0)"
+            exit 0
+          fi
+
+          CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
+          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+            echo "FAIL: could not parse resource_suffix from ${MAIN_TF} (got: ${CURRENT:-empty})"
+            exit 1
+          fi
+
+          NEXT=$((CURRENT + 1))
+          sed -i "s/resource_suffix = \"${CURRENT}\"/resource_suffix = \"${NEXT}\"/" "$MAIN_TF"
+
+          echo "resource_suffix: ${CURRENT} -> ${NEXT}"
+          echo "Next apply will create:"
+          echo "  gcp-tfe-workspace-sa-${NEXT}"
+          echo "  tfe-workspace-pool-${NEXT}"
+          echo "  tfe-workspace-provider-${NEXT}"
+          echo "  bootstrap-prj-500323-tfe-dev-workload-${NEXT}"
+
+      - name: Commit and push suffix bump
+        if: inputs.skip_suffix_bump != true
+        run: |
+          set -euo pipefail
+          MAIN_TF="tfe-workspace/envs/dev/main.tf"
+
+          if ! git diff --quiet -- "$MAIN_TF"; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$MAIN_TF"
+            git commit -m "$(cat <<EOF
+Bump dev workload resource_suffix after destroy.
+
+Rotates SA, WIF pool/provider, and bucket names to avoid GCP soft-delete 409s on the next apply.
+EOF
+)"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          else
+            echo "No suffix change to commit (bump skipped or unchanged)"
+          fi
