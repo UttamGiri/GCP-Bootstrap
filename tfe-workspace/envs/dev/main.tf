@@ -68,7 +68,7 @@ module "storage_buckets" {
 
   buckets = {
     workload = {
-      name               = "bootstrap-prj-500323-tfe-dev-workload-${local.resource_suffix}"
+      name               = "bootstrap-prj-500323-tfe-dev-2-workload-${local.resource_suffix}"
       location           = "US"
       force_destroy      = true
       versioning_enabled = true
