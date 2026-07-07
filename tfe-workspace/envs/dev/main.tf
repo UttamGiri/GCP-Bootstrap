@@ -24,7 +24,7 @@ data "terraform_remote_state" "bootstrap" {
 locals {
   project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
   # Incremented +1 by .github/workflows/tfe-copy-bootstrap-auth.yml after each destroy (SA/WIF only).
-  resource_suffix = "6"
+  resource_suffix = "7"
   # Fixed — never bumped; bucket names are reusable after destroy (soft delete disabled).
   bucket_suffix = "6"
 }
