@@ -97,15 +97,12 @@ To change site or account, edit `env` in `.github/workflows/confluence-docs-sync
 
 ### Automatic
 
+Every push to `main` or `develop` that touches `docs/**` syncs **all mapped** markdown files to Confluence (not just changed files).
+
 | Trigger | What syncs |
 |---------|------------|
-| Push to `main` or `develop` | Changed `docs/*.md` files only |
-| Change to `page-mapping.json` | All mapped docs |
-
-### Manual
-
-1. GitHub → **Actions** → **Confluence Docs Sync** → **Run workflow**.
-2. **sync all:** `true` to push every mapped file.
+| Push to `main` or `develop` | All files in `page-mapping.json` → `dev` |
+| Manual workflow run | All mapped files |
 
 ### Local test (optional)
 
@@ -130,7 +127,8 @@ python3 .github/scripts/sync-confluence.py --env dev --files BOOTSTRAP-FLOW.md
 
 | Error | Likely cause | Fix |
 |-------|--------------|-----|
-| `401 Unauthorized` | Bad email or token | Recreate token; confirm `CONFLUENCE_EMAIL` matches Atlassian login |
+| Job green but page empty | Old workflow skipped sync when no `.md` changed | Push latest workflow; re-run action — log must show `updated README.md -> page ...` |
+| `No pages were updated` | Placeholder page IDs or missing files | Fill real IDs in `page-mapping.json` |
 | `403 Forbidden` | No edit access | Use an account that can edit the target pages |
 | `404 Not found` | Wrong `page_id` | Re-copy ID from Confluence URL |
 | Page name must be unique | Duplicate title in space | Rename page in Confluence when creating; sync does not rename |

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import html
 import json
 import os
 import re
@@ -31,29 +32,51 @@ def load_mapping(env: str) -> dict[str, dict[str, str]]:
     return data[env]
 
 
+def _code_macro(language: str, code: str) -> str:
+    lang = html.escape(language or "none")
+    return (
+        '<ac:structured-macro ac:name="code" ac:schema-version="1">'
+        f'<ac:parameter ac:name="language">{lang}</ac:parameter>'
+        f"<ac:plain-text-body><![CDATA[{code}]]></ac:plain-text-body>"
+        "</ac:structured-macro>"
+    )
+
+
 def markdown_to_storage(md: str) -> str:
     if markdown is None:
         raise SystemExit("markdown package is required: pip install markdown")
 
-    html = markdown.markdown(
+    rendered = markdown.markdown(
         md,
         extensions=["tables", "fenced_code", "sane_lists", "nl2br"],
     )
 
-    # Confluence storage format expects a single root; wrap fragments.
-    if not html.strip():
+    if not rendered.strip():
         return "<p></p>"
 
-    # Mermaid blocks do not render in Confluence without a plugin — show as code.
-    html = re.sub(
-        r"<pre><code class=\"language-mermaid\">(.*?)</code></pre>",
-        r'<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">text</ac:parameter>'
-        r"<ac:plain-text-body><![CDATA[\1]]></ac:plain-text-body></ac:structured-macro>",
-        html,
+    # Confluence storage format does not render raw <pre><code> reliably.
+    def replace_code_block(match: re.Match[str]) -> str:
+        classes = match.group(1) or ""
+        code = html.unescape(match.group(2))
+        language = "none"
+        for token in classes.split():
+            if token.startswith("language-"):
+                language = token.removeprefix("language-")
+                break
+        return _code_macro(language, code)
+
+    storage = re.sub(
+        r'<pre><code(?:\s+class="([^"]*)")?>(.*?)</code></pre>',
+        replace_code_block,
+        rendered,
         flags=re.DOTALL,
     )
 
-    return html
+    # Self-close void tags for XHTML storage format.
+    for tag in ("br", "hr", "img", "input"):
+        storage = re.sub(rf"<{tag}>", rf"<{tag} />", storage)
+
+    return storage
 
 
 def api_request(
@@ -81,18 +104,20 @@ def api_request(
         raise SystemExit(f"Confluence API {method} {url} failed ({exc.code}): {err_body}") from exc
 
 
+def get_page(base_url: str, auth_header: str, page_id: str) -> dict:
+    base = base_url.rstrip("/")
+    url = f"{base}/wiki/rest/api/content/{page_id}?expand=body.storage,version"
+    return api_request("GET", url, auth_header)
+
+
 def update_page(
     base_url: str,
     auth_header: str,
     page_id: str,
     storage_html: str,
-) -> None:
-    base = base_url.rstrip("/")
-    get_url = f"{base}/wiki/rest/api/content/{page_id}?expand=version"
-    current = api_request("GET", get_url, auth_header)
+) -> int:
+    current = get_page(base_url, auth_header, page_id)
     version = current["version"]["number"]
-    # Keep the page title Confluence already has — renaming via API fails if
-    # another page in the same space already uses the mapped title.
     title = current["title"]
 
     payload = {
@@ -107,8 +132,13 @@ def update_page(
             }
         },
     }
+    base = base_url.rstrip("/")
     put_url = f"{base}/wiki/rest/api/content/{page_id}"
     api_request("PUT", put_url, auth_header, payload)
+
+    updated = get_page(base_url, auth_header, page_id)
+    saved = updated.get("body", {}).get("storage", {}).get("value", "")
+    return len(saved)
 
 
 def is_placeholder(page_id: str) -> bool:
@@ -120,27 +150,34 @@ def sync_file(
     mapping: dict[str, dict[str, str]],
     base_url: str,
     auth_header: str,
-) -> None:
+) -> bool:
     if filename not in mapping:
         print(f"skip {filename}: not in page mapping")
-        return
+        return False
 
     entry = mapping[filename]
     page_id = entry["page_id"]
 
     if is_placeholder(page_id):
         print(f"skip {filename}: page_id is still a placeholder ({page_id})")
-        return
+        return False
 
     md_path = DOCS_DIR / filename
     if not md_path.exists():
         print(f"skip {filename}: file not found at {md_path}")
-        return
+        return False
 
     md = md_path.read_text(encoding="utf-8")
     storage_html = markdown_to_storage(md)
-    update_page(base_url, auth_header, page_id, storage_html)
-    print(f"updated {filename} -> page {page_id}")
+    print(f"syncing {filename} -> page {page_id} ({len(storage_html)} bytes storage HTML)")
+    saved_len = update_page(base_url, auth_header, page_id, storage_html)
+    print(f"updated {filename} -> page {page_id} (Confluence body now {saved_len} bytes)")
+    if saved_len < 20:
+        raise SystemExit(
+            f"Page {page_id} looks empty after update ({saved_len} bytes). "
+            "Check Confluence permissions or storage format."
+        )
+    return True
 
 
 def main() -> None:
@@ -173,8 +210,15 @@ def main() -> None:
     mapping = load_mapping(args.env)
     files = args.files or sorted(mapping.keys())
 
+    updated = 0
     for filename in files:
-        sync_file(filename, mapping, base_url, auth_header)
+        if sync_file(filename, mapping, base_url, auth_header):
+            updated += 1
+
+    if updated == 0:
+        raise SystemExit("No pages were updated (check mapping, placeholders, and file list)")
+
+    print(f"Successfully synced {updated} page(s)")
 
 
 if __name__ == "__main__":
