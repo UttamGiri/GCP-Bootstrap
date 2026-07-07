@@ -53,6 +53,8 @@ data "google_project" "current" {
   project_id = var.project_id
 }
 
+# Created first. Destroyed last so this SA can tear down WIF/bucket/other workload
+# resources while credentials are still valid.
 resource "google_service_account" "workspace" {
   project      = var.project_id
   account_id   = var.service_account_id
@@ -72,6 +74,15 @@ resource "google_iam_workload_identity_pool" "workspace" {
   workload_identity_pool_id = var.workload_identity_pool_id
   display_name              = var.workload_identity_pool_display_name
   description               = "OIDC pool for this TFE workspace"
+
+  depends_on = [
+    google_service_account.workspace,
+    google_project_iam_member.workspace_roles,
+  ]
+
+  timeouts {
+    delete = "30m"
+  }
 }
 
 resource "google_iam_workload_identity_pool_provider" "workspace" {
@@ -94,13 +105,15 @@ resource "google_iam_workload_identity_pool_provider" "workspace" {
 
   attribute_condition = "assertion.terraform_workspace_id == '${var.workspace_id}'"
 
-  depends_on = [google_project_iam_member.workspace_roles]
+  depends_on = [google_iam_workload_identity_pool.workspace]
 }
 
 resource "google_service_account_iam_member" "workspace_impersonation" {
   service_account_id = google_service_account.workspace.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/projects/${data.google_project.current.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.workspace.workload_identity_pool_id}/attribute.terraform_workspace_id/${var.workspace_id}"
+
+  depends_on = [google_iam_workload_identity_pool_provider.workspace]
 }
 
 output "service_account_email" {

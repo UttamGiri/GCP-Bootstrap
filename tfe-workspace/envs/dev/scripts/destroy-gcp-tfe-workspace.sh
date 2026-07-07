@@ -87,6 +87,23 @@ copy_bootstrap_auth() {
   echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${wif}"
 }
 
+sync_workload_auth() {
+  local workload_id="$1" sa wif
+  sa=$(read_output "$workload_id" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
+  wif=$(read_output "$workload_id" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
+  if [ -z "$sa" ] || [ -z "$wif" ]; then
+    echo "ERROR: workload outputs missing — apply first or run TFE Sync Workload Auth"
+    exit 1
+  fi
+  upsert_env_var "$workload_id" "TFC_GCP_PROVIDER_AUTH" "true"
+  upsert_env_var "$workload_id" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
+  upsert_env_var "$workload_id" "TFC_GCP_AUTH_IDENTITY" "workload"
+  upsert_env_var "$workload_id" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$sa"
+  upsert_env_var "$workload_id" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$wif"
+  echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${sa}"
+  echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${wif}"
+}
+
 USER=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
   "${API}/account/details" | jq -r '.data.attributes.username // empty')
 if [ -z "$USER" ]; then
@@ -137,6 +154,11 @@ if [ "$resource_count" = "0" ]; then
   echo "Next: run GitHub Actions workflow 'TFE Copy Bootstrap Auth' to bump resource_suffix (+1) and push main.tf."
   exit 0
 fi
+
+echo "Syncing workload auth before destroy (SA deletes itself last)..."
+sync_workload_auth "$WORKLOAD_ID"
+echo "Waiting for TFE to pick up env vars on the destroy run..."
+sleep 10
 
 RUN_RESPONSE=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
   --request POST \

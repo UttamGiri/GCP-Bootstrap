@@ -1,0 +1,112 @@
+name: TFE Switch Bootstrap Auth
+
+# Run AFTER destroy so the next apply uses bs-tfe-sa for the first run.
+# Do NOT run before destroy — destroy uses workload auth (SA deletes itself last).
+#
+# GitHub secret: TFE_TOKEN
+
+on:
+  workflow_dispatch:
+
+jobs:
+  switch-bootstrap-auth:
+    name: Switch GCP-tfe-workspace → bootstrap auth
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Copy bootstrap TFC_GCP env vars to workload workspace
+        env:
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TFE_HOSTNAME="app.terraform.io"
+          TFE_ORG="vaflt-org"
+          BOOTSTRAP_NAME="GCP-Bootstrap"
+          WORKLOAD_NAME="GCP-tfe-workspace"
+          API="https://${TFE_HOSTNAME}/api/v2"
+
+          auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
+
+          if [ -z "${TFE_TOKEN:-}" ]; then
+            echo "Missing secret TFE_TOKEN"
+            exit 1
+          fi
+
+          resolve_workspace_id() {
+            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/organizations/${TFE_ORG}/workspaces/$1" \
+              | jq -r '.data.id // empty'
+          }
+
+          read_env_var() {
+            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/workspaces/$1/vars?page%5Bsize%5D=100" \
+              | jq -r --arg k "$2" '
+                  [.data[]? | select(.attributes.key == $k and .attributes.category == "env")][0].attributes.value // empty
+                '
+          }
+
+          read_output() {
+            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/workspaces/$1/current-state-version-outputs" \
+              | jq -r --arg k "$2" '
+                  [.data[]? | select(.attributes.name == $k)][0].attributes.value
+                  | if . == null then empty elif type == "string" then . else tostring end
+                '
+          }
+
+          upsert_env_var() {
+            local ws_id="$1" key="$2" value="$3" existing_id
+            existing_id=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/workspaces/${ws_id}/vars?page%5Bsize%5D=100" \
+              | jq -r --arg k "$key" '
+                  [.data[]? | select(.attributes.key == $k and .attributes.category == "env")][0].id // empty
+                ')
+            if [ -n "$existing_id" ]; then
+              curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+                --request PATCH \
+                --data "$(jq -n --arg val "$value" '{data:{type:"vars",attributes:{value:$val}}}')" \
+                "${API}/vars/${existing_id}" >/dev/null
+            else
+              curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+                --request POST \
+                --data "$(jq -n --arg key "$key" --arg val "$value" '{
+                  data:{type:"vars",attributes:{key:$key,value:$val,category:"env",hcl:false,sensitive:false}}
+                }')" \
+                "${API}/workspaces/${ws_id}/vars" >/dev/null
+            fi
+            echo "  set ${key}"
+          }
+
+          resolve_auth_value() {
+            local ws_id="$1" env_key="$2" output_key="$3" value
+            value=$(read_env_var "$ws_id" "$env_key")
+            if [ -z "$value" ] || [ "$value" = "null" ]; then
+              value=$(read_output "$ws_id" "$output_key")
+            fi
+            printf '%s' "$value"
+          }
+
+          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME")
+          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME")
+          if [ -z "$BOOTSTRAP_ID" ] || [ -z "$WORKLOAD_ID" ]; then
+            echo "FAIL: workspace not found"
+            exit 1
+          fi
+
+          SA_EMAIL=$(resolve_auth_value "$BOOTSTRAP_ID" \
+            "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
+          WIF_PROVIDER=$(resolve_auth_value "$BOOTSTRAP_ID" \
+            "TFC_GCP_WORKLOAD_PROVIDER_NAME" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
+
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_AUTH_IDENTITY" "bootstrap"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$SA_EMAIL"
+          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$WIF_PROVIDER"
+
+          echo ""
+          echo "Bootstrap auth set for next apply. Run TFE Copy Bootstrap Auth to bump resource_suffix."

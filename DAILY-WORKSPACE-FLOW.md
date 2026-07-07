@@ -158,6 +158,14 @@ After this handoff, normal plans and applies use the workload workspace identity
 
 Daily destroy should remove only workload resources that are safe to recreate.
 
+**Destroy order (Terraform):** all workload modules (buckets, VPC, apps) first → WIF impersonation → WIF provider → WIF pool → project IAM → **workload SA last**. The workload SA stays valid through the run and deletes itself at the end.
+
+**Before destroy:** env vars must match state outputs (`TFC_GCP_*` for the current suffix). The destroy script syncs workload auth automatically; for TFE UI destroy, run **TFE Sync Workload Auth** first.
+
+**After destroy:** run **TFE Switch Bootstrap Auth** then **TFE Copy Bootstrap Auth** (bumps `resource_suffix` when state is empty).
+
+**Adding new resources:** add them in `modules/workload-resources/` only. Do not add sibling modules to `workload-stack/` — that file has the single `depends_on` that protects destroy order.
+
 **Safe to destroy daily:**
 
 - buckets used only for test/demo workload data

@@ -31,47 +31,11 @@ provider "google" {
   project = local.project_id
 }
 
-module "workspace_identity" {
-  source = "../../modules/workspace-identity"
+module "workload" {
+  source = "../../modules/workload-stack"
 
-  project_id   = local.project_id
-  workspace_id = "ws-2UNjJ7BXhV5ZnrAG"
-
-  service_account_id           = "gcp-tfe-workspace-sa-${local.resource_suffix}"
-  service_account_display_name = "GCP TFE Workspace Service Account"
-
-  service_account_roles = [
-    "roles/viewer",
-    "roles/storage.admin",
-    "roles/resourcemanager.projectIamAdmin",
-    "roles/iam.serviceAccountAdmin",
-    "roles/iam.serviceAccountTokenCreator",
-    "roles/iam.workloadIdentityPoolAdmin",
-  ]
-
-  workload_identity_pool_id              = "tfe-workspace-pool-${local.resource_suffix}"
-  workload_identity_pool_display_name    = "GCP TFE Workspace"
-  workload_identity_provider_id          = "tfe-workspace-provider-${local.resource_suffix}"
-  workload_identity_provider_display_name = "GCP TFE Provider"
-}
-
-module "storage_buckets" {
-  source = "../../modules/gcs-buckets"
-
-  project_id = local.project_id
-
-  common_labels = {
-    environment = "dev"
-    managed_by  = "terraform"
-    workspace   = "tfe-dev"
-  }
-
-  buckets = {
-    workload = {
-      name               = "bootstrap-prj-500323-tfe-dev-2-workload-${local.resource_suffix}"
-      location           = "US"
-      force_destroy      = true
-      versioning_enabled = true
-    }
-  }
+  project_id      = local.project_id
+  workspace_id    = "ws-2UNjJ7BXhV5ZnrAG"
+  resource_suffix = local.resource_suffix
+  environment     = "dev"
 }
