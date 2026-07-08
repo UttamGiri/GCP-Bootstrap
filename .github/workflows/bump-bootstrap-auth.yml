@@ -47,9 +47,25 @@ jobs:
           fi
 
           resolve_workspace_id() {
-            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/organizations/${TFE_ORG}/workspaces/$1" \
-              | jq -r '.data.id // empty'
+            local name="$1" resp http_code body id
+            resp=$(curl -sS -w "\n__HTTP__%{http_code}" --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/organizations/${TFE_ORG}/workspaces/${name}")
+            http_code="${resp##*__HTTP__}"
+            body="${resp%__HTTP__*}"
+
+            if [ "$http_code" = "401" ]; then
+              echo "FAIL: TFE API 401 unauthorized — update GitHub secret TFE_TOKEN" >&2
+              echo "Create a token: https://app.terraform.io/app/settings/tokens" >&2
+              return 1
+            fi
+
+            id=$(echo "$body" | jq -r '.data.id // empty')
+            if [ -z "$id" ]; then
+              echo "FAIL: workspace '${name}' not found in org '${TFE_ORG}' (HTTP ${http_code})" >&2
+              echo "$body" | jq -r '.errors[]? | "\(.status) \(.title): \(.detail // .title)"' >&2
+              return 1
+            fi
+            echo "$id"
           }
 
           read_env_var() {
@@ -103,17 +119,8 @@ jobs:
 
           echo "=== Copy bootstrap auth to workload ==="
 
-          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME")
-          if [ -z "$BOOTSTRAP_ID" ]; then
-            echo "Could not find ${BOOTSTRAP_NAME}"
-            exit 1
-          fi
-
-          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME")
-          if [ -z "$WORKLOAD_ID" ]; then
-            echo "Could not find workload workspace: ${WORKLOAD_NAME}"
-            exit 1
-          fi
+          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME") || exit 1
+          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME") || exit 1
 
           echo "Bootstrap: ${BOOTSTRAP_NAME} (${BOOTSTRAP_ID})"
           echo "Workload:  ${WORKLOAD_NAME} (${WORKLOAD_ID})"
