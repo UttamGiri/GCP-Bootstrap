@@ -8,6 +8,9 @@ name: TFE Switch Bootstrap Auth
 on:
   workflow_dispatch:
 
+env:
+  GIT_BRANCH: feature/new-bootstrap
+
 jobs:
   switch-bootstrap-auth:
     name: Switch GCP-vaflt-tfe-workspace → bootstrap auth

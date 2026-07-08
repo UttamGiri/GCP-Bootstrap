@@ -16,12 +16,16 @@ on:
     branches:
       - main
       - develop
+      - feature/new-bootstrap
     paths:
       - 'docs/**'
       - '.github/workflows/confluence-docs-sync.yml'
       - '.github/scripts/sync-confluence.py'
 
   workflow_dispatch:
+
+env:
+  GIT_BRANCH: feature/new-bootstrap
 
 jobs:
   sync:
@@ -34,6 +38,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GIT_BRANCH }}
 
       - name: Install dependencies
         run: pip install markdown

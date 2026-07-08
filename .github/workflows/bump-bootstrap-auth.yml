@@ -4,10 +4,14 @@ name: Bump Bootstrap Auth
 # bumps dev resource_suffix (+1) so the next apply avoids IAM/WIF 409 conflicts.
 #
 # GitHub secret: TFE_TOKEN
+# Commits suffix bumps to GIT_BRANCH (feature/new-bootstrap until merged to main).
 # Triggered manually via Run workflow
 
 on:
   workflow_dispatch:
+
+env:
+  GIT_BRANCH: feature/new-bootstrap
 
 permissions:
   contents: write
@@ -20,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GIT_BRANCH }}
 
       - name: Copy TFC_GCP auth variables
         env:
@@ -218,8 +224,8 @@ jobs:
             git commit \
               -m "Bump dev workload resource_suffix after destroy." \
               -m "Rotates SA and WIF pool/provider names to avoid GCP soft-delete 409s on the next apply. Bucket suffix is unchanged."
-            git pull --rebase origin "${GITHUB_REF_NAME}"
-            git push
+            git pull --rebase origin "${{ env.GIT_BRANCH }}"
+            git push origin "${{ env.GIT_BRANCH }}"
           else
             echo "No suffix change to commit (bump skipped or unchanged)"
           fi

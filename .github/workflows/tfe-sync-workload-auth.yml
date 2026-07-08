@@ -15,6 +15,9 @@ on:
         type: string
         default: ""
 
+env:
+  GIT_BRANCH: feature/new-bootstrap
+
 jobs:
   sync-workload-auth:
     name: Outputs -> GCP-vaflt-tfe-workspace env vars
