@@ -11,7 +11,7 @@ module "storage_buckets" {
 
   buckets = {
     workload = {
-      name               = "bucket-test-${var.project_id}-tfe-${var.environment}-workload-${var.bucket_suffix}"
+      name               = "bucket-test2-${var.project_id}-tfe-${var.environment}-workload-${var.bucket_suffix}"
       location           = "US"
       force_destroy      = true
       versioning_enabled = true
