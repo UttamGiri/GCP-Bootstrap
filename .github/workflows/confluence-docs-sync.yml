@@ -7,7 +7,7 @@ name: Confluence Docs Sync
 #
 # Defaults (edit in workflow env if your site or account changes):
 #   CONFLUENCE_BASE_URL   https://vaflt.atlassian.net
-#   CONFLUENCE_EMAIL      uttamgiri32@gmail.com
+#   CONFLUENCE_EMAIL      uttamgiri32@vaflt.com
 #
 # Configure page IDs in docs/confluence/page-mapping.json (dev section only for now).
 
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONFLUENCE_BASE_URL: https://vaflt.atlassian.net
-      CONFLUENCE_EMAIL: uttamgiri32@gmail.com
+      CONFLUENCE_EMAIL: uttamgiri32@vaflt.com
 
     steps:
       - name: Checkout

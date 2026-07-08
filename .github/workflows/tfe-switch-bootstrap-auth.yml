@@ -10,7 +10,7 @@ on:
 
 jobs:
   switch-bootstrap-auth:
-    name: Switch GCP-tfe-workspace → bootstrap auth
+    name: Switch GCP-vaflt-tfe-workspace → bootstrap auth
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,8 +24,8 @@ jobs:
 
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
-          BOOTSTRAP_NAME="GCP-Bootstrap"
-          WORKLOAD_NAME="GCP-tfe-workspace"
+          BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }

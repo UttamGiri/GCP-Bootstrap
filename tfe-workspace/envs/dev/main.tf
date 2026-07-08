@@ -16,7 +16,7 @@ data "terraform_remote_state" "bootstrap" {
     organization = "vaflt-org"
 
     workspaces = {
-      name = "GCP-Bootstrap"
+      name = "GCP-Vaflt-Bootstrap"
     }
   }
 }
@@ -37,7 +37,7 @@ module "workload" {
   source = "../../modules/workload-stack"
 
   project_id      = local.project_id
-  workspace_id    = "ws-2UNjJ7BXhV5ZnrAG"
+  workspace_id    = "ws-4V97YqCc8p3GH3U9" # GCP-vaflt-tfe-workspace
   resource_suffix = local.resource_suffix
   bucket_suffix   = local.bucket_suffix
   environment     = "dev"

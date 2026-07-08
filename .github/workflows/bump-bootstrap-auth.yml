@@ -1,6 +1,6 @@
 name: Bump Bootstrap Auth
 
-# After destroy: copies GCP-Bootstrap auth env vars to GCP-tfe-workspace and
+# After destroy: copies GCP-Vaflt-Bootstrap auth env vars to GCP-vaflt-tfe-workspace and
 # bumps dev resource_suffix (+1) so the next apply avoids IAM/WIF 409 conflicts.
 #
 # GitHub secret: TFE_TOKEN
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   bump-bootstrap-auth:
-    name: GCP-Bootstrap → GCP-tfe-workspace
+    name: GCP-Vaflt-Bootstrap → GCP-vaflt-tfe-workspace
     runs-on: ubuntu-latest
 
     steps:
@@ -29,8 +29,8 @@ jobs:
 
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
-          BOOTSTRAP_NAME="GCP-Bootstrap"
-          WORKLOAD_NAME="GCP-tfe-workspace"
+          BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
@@ -144,7 +144,7 @@ jobs:
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
-          WORKLOAD_NAME="GCP-tfe-workspace"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://app.terraform.io/api/v2"
 
           if [ -z "${TFE_TOKEN:-}" ]; then

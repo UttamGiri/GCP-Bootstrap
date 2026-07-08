@@ -36,7 +36,7 @@ module "storage_buckets" {
     }
 
     logs = {
-      name               = "bootstrap-prj-500323-tfe-dev-logs"
+      name               = "bootstrap-prj-501802-tfe-dev-logs"
       location           = "US"
       force_destroy      = false
       versioning_enabled = true
@@ -60,13 +60,13 @@ TFE authenticates to GCP before Terraform runs by using workspace environment va
 
 First run:
 
-- `GCP-tfe-workspace` uses the bootstrap service account from `GCP-Bootstrap`.
+- `GCP-vaflt-tfe-workspace` uses the bootstrap service account from `GCP-Vaflt-Bootstrap`.
 - It creates its own workspace service account and WIF pool/provider.
 - It outputs `workspace_service_account_email` and `workspace_workload_identity_provider`.
 
 Consecutive runs:
 
-- Update `GCP-tfe-workspace` environment variables to use its own outputs:
+- Update `GCP-vaflt-tfe-workspace` environment variables to use its own outputs:
 
 ```text
 TFC_GCP_WORKLOAD_PROVIDER_NAME=<workspace output workspace_workload_identity_provider>
@@ -91,7 +91,7 @@ Fix:
 
 ```hcl
 additional_tfe_workspace_ids = [
-  "ws-2UNjJ7BXhV5ZnrAG"
+  "ws-4V97YqCc8p3GH3U9"
 ]
 ```
 
@@ -130,7 +130,7 @@ This configuration uses its own TFE workspace state for managed resources, but r
 
 Remote state access:
 
-- `tfe-dev` reads outputs from `GCP-Bootstrap`
+- `tfe-dev` reads outputs from `GCP-Vaflt-Bootstrap`
 - `tfe-prod` reads outputs from `bootstrap-prod`
 
 In the bootstrap workspace settings, allow the workload workspace as an authorized remote state consumer.
@@ -139,13 +139,13 @@ If this is missing, the workload run fails with:
 
 ```text
 Error retrieving state: forbidden
-This Terraform run is not authorized to read the state of the workspace 'GCP-Bootstrap'.
+This Terraform run is not authorized to read the state of the workspace 'GCP-Vaflt-Bootstrap'.
 ```
 
 Fix in TFE:
 
-1. Open the matching bootstrap workspace, for example `GCP-Bootstrap`.
+1. Open the matching bootstrap workspace, for example `GCP-Vaflt-Bootstrap`.
 2. Go to **Settings -> General -> Remote state sharing**.
 3. Choose **Share with specific workspaces**.
-4. Add the workload workspace, for example `GCP-tfe-workspace`.
+4. Add the workload workspace, for example `GCP-vaflt-tfe-workspace`.
 5. Save and re-run the workload workspace.

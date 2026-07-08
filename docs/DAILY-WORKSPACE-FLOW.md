@@ -12,8 +12,8 @@ The goal is to support a daily destroy/recreate workflow without destroying the 
 
 There are two identity phases:
 
-- **Bootstrap identity phase:** `GCP-tfe-workspace` uses `bs-tfe-sa` and the bootstrap WIF provider for the first run.
-- **Workload identity phase:** `GCP-tfe-workspace` switches to its own service account and its own WIF provider for later runs.
+- **Bootstrap identity phase:** `GCP-vaflt-tfe-workspace` uses `bs-tfe-sa` and the bootstrap WIF provider for the first run.
+- **Workload identity phase:** `GCP-vaflt-tfe-workspace` switches to its own service account and its own WIF provider for later runs.
 
 Terraform cannot automatically switch identities inside one run because TFE injects `TFC_GCP_*` environment variables before Terraform starts. The handoff therefore happens between runs.
 
@@ -24,11 +24,11 @@ Terraform cannot automatically switch identities inside one run because TFE inje
 ```mermaid
 %%{init: {'themeVariables': {'fontSize': '22px'}}}%%
 flowchart TB
-    B1["GCP-Bootstrap workspace"]
+    B1["GCP-Vaflt-Bootstrap workspace"]
     B2["terraform-bootstrap/envs/dev"]
     B3["Creates bs-tfe-sa"]
     B4["Creates bs WIF pool/provider"]
-    B5["Trusts GCP-tfe-workspace"]
+    B5["Trusts GCP-vaflt-tfe-workspace"]
     B6["Shares outputs + state"]
 
     B1 --> B2
@@ -45,7 +45,7 @@ flowchart TB
 ```mermaid
 %%{init: {'themeVariables': {'fontSize': '22px'}}}%%
 flowchart TB
-    A1["GCP-tfe-workspace env"]
+    A1["GCP-vaflt-tfe-workspace env"]
     A2["Use bs-tfe-sa"]
     A3["Use bootstrap WIF provider"]
     W1["Read bootstrap outputs"]
@@ -103,26 +103,26 @@ flowchart LR
 
 ## Key Rule
 
-`GCP-tfe-workspace` can use `bs-tfe-sa` for the first run, create its own workload service account, and then use the workload service account for later runs.
+`GCP-vaflt-tfe-workspace` can use `bs-tfe-sa` for the first run, create its own workload service account, and then use the workload service account for later runs.
 
 ---
 
 ## First Run Setup
 
-In `GCP-tfe-workspace`, use bootstrap identity values:
+In `GCP-vaflt-tfe-workspace`, use bootstrap identity values:
 
 <pre style="font-size: 20px;">
 TFC_GCP_PROVIDER_AUTH=true
 TFC_GCP_PRINCIPAL_TYPE=service_account
-TFC_GCP_WORKLOAD_PROVIDER_NAME=&lt;GCP-Bootstrap output tfe_workload_identity_provider&gt;
-TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=&lt;GCP-Bootstrap output bootstrap_service_account_email&gt;
+TFC_GCP_WORKLOAD_PROVIDER_NAME=&lt;GCP-Vaflt-Bootstrap output tfe_workload_identity_provider&gt;
+TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=&lt;GCP-Vaflt-Bootstrap output bootstrap_service_account_email&gt;
 </pre>
 
 The first run creates:
 
 - workload service account, for example `gcp-tfe-workspace-sa`
 - workload WIF pool/provider, for example `tfe-workspace-pool` / `tfe-workspace-provider`
-- impersonation binding for workspace `ws-2UNjJ7BXhV5ZnrAG`
+- impersonation binding for workspace `ws-4V97YqCc8p3GH3U9`
 - workload resources such as buckets, VPCs, and application infrastructure
 
 The first run outputs:
@@ -136,7 +136,7 @@ workspace_workload_identity_provider
 
 ## Handoff After First Run
 
-After the first successful apply, update the `GCP-tfe-workspace` environment variables:
+After the first successful apply, update the `GCP-vaflt-tfe-workspace` environment variables:
 
 <pre style="font-size: 20px;">
 TFC_GCP_WORKLOAD_PROVIDER_NAME=&lt;workspace output workspace_workload_identity_provider&gt;
@@ -234,7 +234,7 @@ The WIF provider being used does not trust the current TFE workspace ID.
 Error retrieving state: forbidden
 </pre>
 
-`GCP-Bootstrap` has not shared remote state with `GCP-tfe-workspace`.
+`GCP-Vaflt-Bootstrap` has not shared remote state with `GCP-vaflt-tfe-workspace`.
 
 **After destroy:**
 

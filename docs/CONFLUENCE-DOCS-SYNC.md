@@ -87,7 +87,7 @@ Only **one** repository secret is required:
 | Setting | Default |
 |---------|---------|
 | `CONFLUENCE_BASE_URL` | `https://vaflt.atlassian.net` |
-| `CONFLUENCE_EMAIL` | `uttamgiri32@gmail.com` |
+| `CONFLUENCE_EMAIL` | `uttamgiri32@vaflt.com` |
 
 To change site or account, edit `env` in `.github/workflows/confluence-docs-sync.yml`.
 

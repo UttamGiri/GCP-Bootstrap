@@ -1,6 +1,6 @@
 name: TFE Sync Workload Auth
 
-# Reads TFC_GCP_* Terraform OUTPUTS from GCP-tfe-workspace state and replaces
+# Reads TFC_GCP_* Terraform OUTPUTS from GCP-vaflt-tfe-workspace state and replaces
 # the same workspace env vars (workload own SA + WIF for self-run auth).
 #
 # GitHub secret: TFE_TOKEN
@@ -17,7 +17,7 @@ on:
 
 jobs:
   sync-workload-auth:
-    name: Outputs -> GCP-tfe-workspace env vars
+    name: Outputs -> GCP-vaflt-tfe-workspace env vars
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,7 +32,7 @@ jobs:
 
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
-          WORKLOAD_NAME="GCP-tfe-workspace"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
