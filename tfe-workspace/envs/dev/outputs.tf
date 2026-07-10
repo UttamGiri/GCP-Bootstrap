@@ -1,22 +1,19 @@
-# First run uses bootstrap env vars (bs-tfe-sa). After apply, run GitHub Action
-# "TFE Sync Workload Auth" to copy these outputs into workspace env vars.
-
-output "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" {
-  description = "Workload service account for TFE GCP auth"
-  value       = module.workload.TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL
+output "shared_networks" {
+  description = "Shared VPC host project and subnets per environment (dev, prod)"
+  value       = module.platform.shared_networks
 }
 
-output "TFC_GCP_WORKLOAD_PROVIDER_NAME" {
-  description = "Workload WIF provider for TFE GCP auth"
-  value       = module.workload.TFC_GCP_WORKLOAD_PROVIDER_NAME
+output "org_folder_names" {
+  description = "GCP folder resource names (platform, dev, prod)"
+  value       = module.platform.folder_names
 }
 
-output "bucket_names" {
-  description = "Created GCS bucket names"
-  value       = module.workload.bucket_names
+output "org_folder_ids" {
+  description = "Numeric GCP folder IDs (platform, dev, prod)"
+  value       = module.platform.folder_ids
 }
 
-output "bucket_urls" {
-  description = "Created GCS bucket URLs"
-  value       = module.workload.bucket_urls
+output "workload_projects" {
+  description = "Per-team handoff: project_id, SA email, WIF provider"
+  value       = module.platform.workload_projects
 }

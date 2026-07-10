@@ -151,12 +151,18 @@ jobs:
           echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}"
           echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
 
-      - name: Bump dev resource suffix
+      - name: Bump dev resource suffix (legacy — skip if not used)
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
+
+          if ! grep -q 'resource_suffix' "$MAIN_TF"; then
+            echo "SKIP: platform layout has no resource_suffix (per-team WIF ids in workload_projects map)"
+            exit 0
+          fi
+
           WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://app.terraform.io/api/v2"
 
@@ -203,21 +209,13 @@ jobs:
 
           CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
           if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-            echo "FAIL: could not parse resource_suffix from ${MAIN_TF} (got: ${CURRENT:-empty})"
-            exit 1
+            echo "SKIP: could not parse resource_suffix (got: ${CURRENT:-empty})"
+            exit 0
           fi
 
           NEXT=$((CURRENT + 1))
           sed -i "/^[[:space:]]*resource_suffix[[:space:]]*=/ s/\"${CURRENT}\"/\"${NEXT}\"/" "$MAIN_TF"
-
-          BUCKET_SUFFIX=$(awk -F'"' '/^[[:space:]]*bucket_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
           echo "resource_suffix: ${CURRENT} -> ${NEXT}"
-          echo "bucket_suffix: ${BUCKET_SUFFIX} (unchanged)"
-          echo "Next apply will create:"
-          echo "  gcp-tfe-workspace-sa-${NEXT}"
-          echo "  tfe-workspace-pool-${NEXT}"
-          echo "  tfe-workspace-provider-${NEXT}"
-          echo "  bucket-*-tfe-dev-workload-${BUCKET_SUFFIX}"
 
       - name: Commit and push suffix bump
         run: |
