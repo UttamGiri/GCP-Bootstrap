@@ -92,9 +92,8 @@ variable "workload_projects" {
     shared_network_key                      = string
     project_id                              = string
     project_name                            = string
-    tfe_workspace_id                        = string
-    service_account_id                      = string
-    service_account_display_name            = optional(string)
+    tfe_workspace_id                        = optional(string, "")
+    service_account_id                      = optional(string, "")
     service_account_roles                   = optional(list(string))
     subnet_cidr                             = optional(string)
     subnet_region                           = optional(string)
@@ -104,6 +103,14 @@ variable "workload_projects" {
     workload_identity_pool_display_name     = optional(string)
     workload_identity_provider_id           = optional(string)
     workload_identity_provider_display_name = optional(string)
+    enable_identity                         = optional(bool, false)
+    human_users                             = optional(map(list(string)), {})
+    storage_buckets = optional(map(object({
+      location                    = string
+      storage_class               = optional(string)
+      force_destroy               = optional(bool)
+      uniform_bucket_level_access = optional(bool)
+    })), {})
   }))
   default = {}
 
@@ -113,5 +120,15 @@ variable "workload_projects" {
       !contains(["dev", "preprod"], t.shared_network_key) || try(t.subnet_cidr, null) != null
     ])
     error_message = "Each dev/preprod team must set subnet_cidr — one dedicated subnet is created per team map key."
+  }
+
+  validation {
+    condition = alltrue([
+      for k, t in var.workload_projects :
+      !coalesce(t.enable_identity, false) || (
+        try(t.tfe_workspace_id, "") != "" && try(t.service_account_id, "") != ""
+      )
+    ])
+    error_message = "tfe_workspace_id and service_account_id are required when enable_identity is true."
   }
 }

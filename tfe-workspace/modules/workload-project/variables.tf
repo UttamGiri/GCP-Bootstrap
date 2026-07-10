@@ -25,13 +25,38 @@ variable "project_labels" {
 }
 
 variable "tfe_workspace_id" {
-  description = "TFE workspace ID allowed to impersonate this project's service account"
+  description = "TFE workspace ID allowed to impersonate this project's service account (required when enable_identity is true)"
   type        = string
+  default     = ""
+}
+
+variable "enable_identity" {
+  description = "Create team SA + WIF scoped to tfe_workspace_id"
+  type        = bool
+  default     = false
+}
+
+variable "human_users" {
+  description = "Human GCP users and project roles — only on this team project"
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "storage_buckets" {
+  description = "GCS object storage buckets in this team project (globally unique bucket names)"
+  type = map(object({
+    location                    = string
+    storage_class               = optional(string)
+    force_destroy               = optional(bool)
+    uniform_bucket_level_access = optional(bool)
+  }))
+  default = {}
 }
 
 variable "service_account_id" {
-  description = "Service account ID (short name) for the team's TFE runs"
+  description = "Service account ID (short name) for the team's TFE runs (required when enable_identity is true)"
   type        = string
+  default     = ""
 }
 
 variable "service_account_display_name" {

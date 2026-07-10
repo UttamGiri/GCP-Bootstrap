@@ -38,18 +38,30 @@ locals {
       shared_network_key = "dev"
       project_id         = "workload-a-dev-prj"
       project_name       = "Workload A Dev"
-      tfe_workspace_id   = "ws-REPLACE-WORKLOAD-A-DEV" # set when team A TFE workspace exists
-      service_account_id = "tfe-workload-a-dev-sa"
-      subnet_cidr        = "10.10.0.0/24" # subnet name: workload-a-dev
+      subnet_cidr        = "10.10.0.0/24"
+
+      # uttam.giri@vaflt.com — workload A only (no access on workload-b-dev)
+      human_users = {
+        "uttam.giri@vaflt.com" = [
+          "roles/storage.admin",
+          "roles/viewer",
+        ]
+      }
+
+      # GCS object storage — team A project only
+      storage_buckets = {
+        workload-a-dev-prj-object-storage = {
+          location = "US"
+        }
+      }
     }
     workload-b-dev = {
       folder_key         = "dev"
       shared_network_key = "dev"
       project_id         = "workload-b-dev-prj"
       project_name       = "Workload B Dev"
-      tfe_workspace_id   = "ws-REPLACE-WORKLOAD-B-DEV" # set when team B TFE workspace exists
-      service_account_id = "tfe-workload-b-dev-sa"
-      subnet_cidr        = "10.10.1.0/24" # subnet name: workload-b-dev
+      subnet_cidr        = "10.10.1.0/24"
+      # no human_users, no storage_buckets — isolated from team A
     }
   }
 }

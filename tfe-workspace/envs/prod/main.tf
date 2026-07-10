@@ -22,10 +22,10 @@ data "terraform_remote_state" "bootstrap" {
 }
 
 locals {
-  org_id                = "327947404107"
-  billing_account       = "01BC6F-241F9A-8762DE"
-  provider_project_id   = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
-  workload_projects     = {}
+  org_id              = "327947404107"
+  billing_account     = "01BC6F-241F9A-8762DE"
+  provider_project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
+  workload_projects   = {}
 }
 
 provider "google" {

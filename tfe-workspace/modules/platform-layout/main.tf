@@ -87,9 +87,12 @@ module "workload_projects" {
   )
 
   # Identity inputs kept for when workload-project module.identity is uncommented.
+  enable_identity              = coalesce(each.value.enable_identity, false)
   tfe_workspace_id             = each.value.tfe_workspace_id
   service_account_id           = each.value.service_account_id
   service_account_display_name = each.value.service_account_display_name
+  human_users                  = coalesce(each.value.human_users, {})
+  storage_buckets              = coalesce(each.value.storage_buckets, {})
   service_account_roles = coalesce(
     each.value.service_account_roles,
     var.default_service_account_roles,
@@ -141,6 +144,8 @@ output "workload_projects" {
     for key, mod in module.workload_projects : key => {
       project_id                        = mod.project_id
       shared_subnet_self_links          = mod.shared_subnet_self_links
+      storage_bucket_names              = mod.storage_bucket_names
+      human_users                       = mod.human_users
       tfe_workspace_id                  = mod.tfe_workspace_id
       TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL = mod.TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL
       TFC_GCP_WORKLOAD_PROVIDER_NAME    = mod.TFC_GCP_WORKLOAD_PROVIDER_NAME
