@@ -96,10 +96,16 @@ variable "shared_vpc_host_project_id" {
   default     = null
 }
 
-variable "shared_subnet_self_links" {
-  description = "Subnet self links in the host project where the team SA gets compute.networkUser"
+variable "shared_subnet_names" {
+  description = "Subnet names in the host project where this service project gets compute.networkUser"
   type        = list(string)
   default     = []
+}
+
+variable "shared_subnet_region" {
+  description = "Region of shared_subnet_names in the host VPC (all names must be in this region for now)"
+  type        = string
+  default     = "us-central1"
 }
 
 # Disabled: SA + WIF per team (see module.identity in workload-project/main.tf).

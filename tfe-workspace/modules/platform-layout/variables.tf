@@ -94,6 +94,7 @@ variable "workload_projects" {
     project_name                            = string
     tfe_workspace_id                        = optional(string, "")
     service_account_id                      = optional(string, "")
+    service_account_display_name            = optional(string)
     service_account_roles                   = optional(list(string))
     subnet_cidr                             = optional(string)
     subnet_region                           = optional(string)

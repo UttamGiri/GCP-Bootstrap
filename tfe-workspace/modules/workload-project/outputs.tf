@@ -18,9 +18,9 @@ output "tfe_workspace_id" {
   value       = var.tfe_workspace_id
 }
 
-output "shared_subnet_self_links" {
+output "shared_subnet_names" {
   description = "Subnets this service project may use (networkUser granted per subnet only)"
-  value       = var.shared_subnet_self_links
+  value       = var.shared_subnet_names
 }
 
 output "storage_bucket_names" {

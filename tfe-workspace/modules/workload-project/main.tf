@@ -90,9 +90,12 @@ resource "google_storage_bucket" "team" {
 }
 
 # Subnet-scoped access: service project can use only its assigned subnet(s), not other teams' subnets.
+# Keys are subnet names (known at plan time); avoid self_link in for_each (unknown until subnet exists).
 resource "google_compute_subnetwork_iam_member" "shared_network_user" {
-  for_each = var.shared_vpc_host_project_id != null ? toset(var.shared_subnet_self_links) : toset([])
+  for_each = var.shared_vpc_host_project_id != null ? toset(var.shared_subnet_names) : toset([])
 
+  project    = var.shared_vpc_host_project_id
+  region     = var.shared_subnet_region
   subnetwork = each.value
   role       = "roles/compute.networkUser"
   member     = "serviceProject:${google_project.workload.project_id}"
@@ -101,8 +104,10 @@ resource "google_compute_subnetwork_iam_member" "shared_network_user" {
 }
 
 resource "google_compute_subnetwork_iam_member" "team_sa_network_user" {
-  for_each = var.enable_identity && var.shared_vpc_host_project_id != null ? toset(var.shared_subnet_self_links) : toset([])
+  for_each = var.enable_identity && var.shared_vpc_host_project_id != null ? toset(var.shared_subnet_names) : toset([])
 
+  project    = var.shared_vpc_host_project_id
+  region     = var.shared_subnet_region
   subnetwork = each.value
   role       = "roles/compute.networkUser"
   member     = "serviceAccount:${module.identity[0].service_account_email}"

@@ -90,7 +90,7 @@ module "workload_projects" {
   enable_identity              = coalesce(each.value.enable_identity, false)
   tfe_workspace_id             = each.value.tfe_workspace_id
   service_account_id           = each.value.service_account_id
-  service_account_display_name = each.value.service_account_display_name
+  service_account_display_name = try(each.value.service_account_display_name, null)
   human_users                  = coalesce(each.value.human_users, {})
   storage_buckets              = coalesce(each.value.storage_buckets, {})
   service_account_roles = coalesce(
@@ -104,10 +104,12 @@ module "workload_projects" {
   workload_identity_provider_display_name = coalesce(each.value.workload_identity_provider_display_name, "TFE ${each.key}")
 
   shared_vpc_host_project_id = module.shared_networks[each.value.shared_network_key].host_project_id
-  shared_subnet_self_links = [
-    for name in coalesce(each.value.shared_subnet_names, ["workload"]) :
-    module.shared_networks[each.value.shared_network_key].subnet_self_links[name]
-  ]
+  shared_subnet_names = coalesce(each.value.shared_subnet_names, ["workload"])
+  shared_subnet_region = coalesce(
+    try(each.value.subnet_region, null),
+    try(var.shared_networks[each.value.shared_network_key].subnets["workload"].region, null),
+    "us-central1",
+  )
 
   depends_on = [
     module.org_folders,
@@ -143,7 +145,7 @@ output "workload_projects" {
   value = {
     for key, mod in module.workload_projects : key => {
       project_id                        = mod.project_id
-      shared_subnet_self_links          = mod.shared_subnet_self_links
+      shared_subnet_names               = mod.shared_subnet_names
       storage_bucket_names              = mod.storage_bucket_names
       human_users                       = mod.human_users
       tfe_workspace_id                  = mod.tfe_workspace_id
