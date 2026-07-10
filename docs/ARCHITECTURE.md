@@ -52,8 +52,8 @@ module.platform (platform-layout/)
 | **shared-network (dev)** | project, 2 APIs, shared VPC host, VPC (subnets per team when added) | **5** |
 | **shared-network (preprod)** | same | **5** |
 | **shared-network (prod)** | project, 2 APIs, shared VPC host, VPC, 1 subnet | **6** |
-| **workload-project** | none (map empty) | **0** |
-| | **Total** | **25** |
+| **workload-project** | 2 teams x 6 each | **12** |
+| | **Total (with A + B today)** | **37** |
 
 **GCP projects created:** 3 (`vaflt-shared-net-dev`, `vaflt-shared-net-preprod`, `vaflt-shared-net-prod`)  
 **Bootstrap project:** not touched
@@ -100,7 +100,7 @@ FIRST APPLY = 25 resources
 └── vaflt-shared-net-prod/    (6 resources)
       shared-vpc-prod + subnet workload
 
-(workload team projects: none until map populated)
+(workload-a-dev + workload-b-dev in map today)
 (team SA + WIF: commented out in workload-project/main.tf)
 ```
 
@@ -108,71 +108,81 @@ FIRST APPLY = 25 resources
 
 ## 3. Architecture diagram
 
+### 3a. What `platform-layout` does (orchestrator)
+
+```mermaid
+flowchart LR
+  ENV["envs/dev/main.tf"]
+  PL["platform-layout"]
+  OF["org-folders"]
+  FP["folder-policies"]
+  SN["shared-network"]
+  WP["workload-project"]
+
+  ENV -->|"org_id, billing, workload_projects map"| PL
+  PL --> OF
+  PL --> FP
+  PL --> SN
+  PL --> WP
+  PL -->|"derives subnets from teams"| SN
+  PL -->|"wires host VPC + subnet links"| WP
+```
+
+```text
+envs/dev/main.tf                    platform-layout                      GCP (via child modules)
+────────────────                    ───────────────                      ──────────────────────
+workload_projects map        →      locals: team subnets per env   →    subnets on host VPC
+                                    locals: subnet name per team   →    networkUser on 1 subnet only
+                                    module.org_folders             →    Platform, Dev, Prod folders
+                                    module.folder_policies         →    OU policies
+                                    module.shared_networks         →    host projects + VPCs
+                                    module.workload_projects       →    team projects + attach
+```
+
+### 3b. Shared VPC + subnet isolation (dev)
+
 ```mermaid
 flowchart TB
-  subgraph bootstrap["terraform-bootstrap — UNTOUCHED"]
-    BP["bootstrap-prj-501802"]
-    BSA["bs-tfe-sa"]
-    BWIF["bootstrap WIF pool"]
-    BP --> BSA
-    BP --> BWIF
-  end
+  HOST["vaflt-shared-net-dev host project"]
+  VPC["shared-vpc-dev"]
+  SA["subnet workload-a-dev 10.10.0.0/24"]
+  SB["subnet workload-b-dev 10.10.1.0/24"]
+  PA["workload-a-dev-prj"]
+  PB["workload-b-dev-prj"]
 
-  subgraph tfe["TFE: GCP-vaflt-tfe-workspace"]
-    PL["module.platform / platform-layout"]
-  end
+  HOST --> VPC
+  VPC --> SA
+  VPC --> SB
+  SA -->|"networkUser serviceProject only"| PA
+  SB -->|"networkUser serviceProject only"| PB
+  VPC -->|"shared VPC attach"| PA
+  VPC -->|"shared VPC attach"| PB
+```
 
-  subgraph org["vaflt.com org"]
-    subgraph folders["org-folders — 3 resources"]
-      Fplat["Platform/"]
-      Fdev["Dev/"]
-      Fprod["Prod/"]
-    end
+Team A and B share the **VPC** but each project can only use **its own subnet** (not the other team's).
 
-    subgraph policies["folder-policies — 6 resources"]
-      Pdev["Dev OU policies<br/>regions · no SA keys · bucket rules"]
-      Pprod["Prod OU policies"]
-    end
+### 3c. Full platform stack
 
-    subgraph devEnv["Dev environment"]
-      SNdev["vaflt-shared-net-dev — 5+ resources<br/>shared-vpc-dev + 1 subnet per team"]
-      SNpre["vaflt-shared-net-preprod — 5+ resources<br/>shared-vpc-preprod + 1 subnet per team"]
-      WA["workload-a-dev-prj<br/>6 resources<br/>subnet workload-a-dev only"]
-      WB["workload-b-dev-prj<br/>6 resources<br/>subnet workload-b-dev only"]
-    end
+```mermaid
+flowchart TB
+  BOOT["bootstrap-prj + bs-tfe-sa"]
+  TFE["TFE GCP-vaflt-tfe-workspace"]
+  PL["platform-layout"]
 
-    subgraph prodEnv["Prod environment"]
-      SNprod["vaflt-shared-net-prod — 6 resources<br/>shared-vpc-prod + subnet workload"]
-      WP["workload-*-prod-prj<br/>when added to map"]
-    end
-  end
+  BOOT -.->|auth| TFE
+  TFE --> PL
 
-  BSA -.->|auth| tfe
-  tfe --> PL
-  PL --> folders
-  PL --> policies
-  PL --> SNdev
-  PL --> SNprod
-  PL -.->|workload_projects map| WA
-  PL -.->|workload_projects map| WB
-  Fdev --> SNdev
-  Fdev --> WA
-  Fdev --> WB
-  Fprod --> SNprod
-  Fprod --> WP
-  Fdev --> Pdev
-  Fprod --> Pprod
-  SNdev -.->|shared VPC attach| WA
-  SNdev -.->|shared VPC attach| WB
-  SNprod -.->|shared VPC attach| WP
+  PL --> OF["org-folders: 3 folders"]
+  PL --> FP["folder-policies: 6 policies"]
+  PL --> SND["shared-net-dev + preprod + prod"]
+  PL --> WPD["workload-a-dev-prj"]
+  PL --> WPB["workload-b-dev-prj"]
 
-  subgraph teams["Workload teams — external repos"]
-    TRA["Team A repo<br/>app infra later"]
-    TRB["Team B repo"]
-  end
+  SND --> WPD
+  SND --> WPB
 
-  WA -.-> TRA
-  WB -.-> TRB
+  WPD --> REPA["Team A repo later"]
+  WPB --> REPB["Team B repo later"]
 ```
 
 ---
