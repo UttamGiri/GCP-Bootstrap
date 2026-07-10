@@ -11,7 +11,7 @@ set -euo pipefail
 
 TFE_HOSTNAME="${TFE_HOSTNAME:-app.terraform.io}"
 TFE_ORG="${TFE_ORG:-vaflt-org}"
-WORKLOAD_NAME="${WORKLOAD_NAME:-GCP-vaflt-tfe-workspace}"
+WORKLOAD_NAME="${WORKLOAD_NAME:-GCP-VAFLT-TFE-WORK}"
 BOOTSTRAP_NAME="${BOOTSTRAP_NAME:-GCP-Vaflt-Bootstrap}"
 API="https://${TFE_HOSTNAME}/api/v2"
 

@@ -28,7 +28,7 @@ Flow guides and runbooks live in [docs/](docs/). They sync to Confluence via the
 Use two separate TFE/TFC workspaces:
 
 - `GCP-Vaflt-Bootstrap`: runs `terraform-bootstrap/envs/dev` (`ws-MqdANNRijWaRBrMj`)
-- `GCP-vaflt-tfe-workspace`: runs `tfe-workspace/envs/dev` (`ws-4V97YqCc8p3GH3U9`)
+- `GCP-VAFLT-TFE-WORK`: runs `tfe-workspace/envs/dev` (`ws-4V97YqCc8p3GH3U9`)
 - `bootstrap-prod`: runs `terraform-bootstrap/envs/prod`
 - `tfe-prod`: runs `tfe-workspace/envs/prod`
 
@@ -39,19 +39,19 @@ The bootstrap workspace creates and owns:
 - IAM roles
 - WIF impersonation bindings for trusted TFE workspace IDs
 
-The `GCP-vaflt-tfe-workspace` and `tfe-prod` workspaces use the bootstrap service account and WIF provider to run separate Terraform configurations. In this repo, the environment folders under `tfe-workspace/envs/` create GCP storage buckets.
+The `GCP-VAFLT-TFE-WORK` and `tfe-prod` workspaces use the bootstrap service account and WIF provider to run separate Terraform configurations. In this repo, the environment folders under `tfe-workspace/envs/` create GCP storage buckets.
 
 Important concept:
 
 - GCP authentication is not determined by the `tfe-dev` Terraform state.
 - GCP authentication is determined by `TFC_GCP_*` environment variables in the `tfe-dev` workspace.
 - Resource existence is determined by the `tfe-dev` workspace state plus refresh against GCP.
-- Workload workspaces keep their own resource state, but read bootstrap outputs with `terraform_remote_state`. `GCP-Vaflt-Bootstrap` must share state with `GCP-vaflt-tfe-workspace` under **Settings -> General -> Remote state sharing**.
+- Workload workspaces keep their own resource state, but read bootstrap outputs with `terraform_remote_state`. `GCP-Vaflt-Bootstrap` must share state with `GCP-VAFLT-TFE-WORK` under **Settings -> General -> Remote state sharing**.
 - GCP authentication still comes from `TFC_GCP_*` environment variables set on the workspace before the run starts.
 
 Before running `tfe-dev`, the bootstrap WIF provider must trust the `tfe-dev` workspace ID. The bootstrap dev root in `terraform-bootstrap/envs/dev` is intentionally kept separate and should only be changed when you are ready to update bootstrap trust.
 
-For the current `GCP-vaflt-tfe-workspace`, the dev bootstrap code includes this trusted workspace ID:
+For the current **`GCP-VAFLT-TFE-WORK`** workspace, the dev bootstrap code includes this trusted workspace ID:
 
 ```hcl
 additional_tfe_workspace_ids = [

@@ -32,7 +32,7 @@ module "bootstrap" {
 
   tfe_workspace_id = "ws-MqdANNRijWaRBrMj" # GCP-Vaflt-Bootstrap
   additional_tfe_workspace_ids = [
-    "ws-4V97YqCc8p3GH3U9", # GCP-vaflt-tfe-workspace
+    "ws-4V97YqCc8p3GH3U9", # GCP-VAFLT-TFE-WORK (platform deploy workspace)
     "ws-8nSCANEJTL1guUNk"
   ]
 

@@ -10,7 +10,11 @@ terraform {
 }
 
 # Bootstrap remote state: read-only. Platform never writes to bootstrap project.
+# Deploy workspace: GCP-VAFLT-TFE-WORK (working dir tfe-workspace/envs/dev)
+# Requires GCP-Vaflt-Bootstrap → Settings → Remote state sharing → GCP-VAFLT-TFE-WORK
 data "terraform_remote_state" "bootstrap" {
+  count = var.bootstrap_project_id == null ? 1 : 0
+
   backend = "remote"
 
   config = {
@@ -28,7 +32,10 @@ locals {
 
   # Provider default project — auth context only (bootstrap SA). Platform resources
   # are created in folders / team projects / shared-network host projects below.
-  provider_project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
+  provider_project_id = coalesce(
+    var.bootstrap_project_id,
+    data.terraform_remote_state.bootstrap[0].outputs.bootstrap_project_id,
+  )
 
   # Lower envs: one subnet per team (map key = subnet name). Each service project gets
   # networkUser only on its subnet — shared VPC, but teams cannot use each other's subnets.

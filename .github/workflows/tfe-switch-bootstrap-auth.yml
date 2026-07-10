@@ -28,7 +28,7 @@ jobs:
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
           BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
-          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
+          WORKLOAD_NAME="GCP-VAFLT-TFE-WORK"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }

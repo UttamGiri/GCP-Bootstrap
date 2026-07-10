@@ -10,7 +10,7 @@ Workload teams own **separate repos** — not documented here except handoff out
 ## 1. Platform scope — what platform creates
 
 ```text
-TFE: GCP-vaflt-tfe-workspace  →  tfe-workspace/envs/dev
+TFE: GCP-VAFLT-TFE-WORK  →  tfe-workspace/envs/dev
 Auth: bs-tfe-sa (bootstrap SA)
 
 module.platform (platform-layout/)
@@ -166,7 +166,7 @@ Team A and B share the **VPC** but each project can only use **its own subnet** 
 ```mermaid
 flowchart TB
   BOOT["bootstrap-prj + bs-tfe-sa"]
-  TFE["TFE GCP-vaflt-tfe-workspace"]
+  TFE["TFE GCP-VAFLT-TFE-WORK"]
   PL["platform-layout"]
 
   BOOT -.->|auth| TFE
