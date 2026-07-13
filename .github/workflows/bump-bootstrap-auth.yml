@@ -1,33 +1,116 @@
 name: Bump Bootstrap Auth
 
-# After destroy: copies GCP-Vaflt-Bootstrap auth env vars to GCP-vaflt-tfe-workspace and
-# bumps dev resource_suffix (+1) so the next apply avoids IAM/WIF 409 conflicts.
+# Modes (workflow_dispatch):
+# - bootstrap_only=true: bump terraform-bootstrap WIF IDs, create branch + PR to base_branch.
+#   Does NOT copy TFC_GCP_* env vars. Does NOT bump resource_suffix.
+# - bootstrap_only=false (legacy): copy auth vars + bump resource_suffix when state empty.
 #
-# GitHub secret: TFE_TOKEN
-# Commits suffix bumps to GIT_BRANCH (feature/new-bootstrap until merged to main).
-# Triggered manually via Run workflow
+# GitHub secret: TFE_TOKEN (legacy mode only)
 
 on:
   workflow_dispatch:
+    inputs:
+      bootstrap_only:
+        description: "Bootstrap WIF bump only — new branch + PR, no TFC var copy"
+        type: boolean
+        default: true
+      base_branch:
+        description: "Base branch for bootstrap-only PR"
+        type: string
+        default: feature/new-bootstrap
 
 env:
   GIT_BRANCH: feature/new-bootstrap
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   bump-bootstrap-auth:
-    name: GCP-Vaflt-Bootstrap → GCP-vaflt-tfe-workspace
+    name: Bootstrap auth bump
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.GIT_BRANCH }}
+          ref: ${{ inputs.bootstrap_only && inputs.base_branch || env.GIT_BRANCH }}
+
+      - name: Bump bootstrap WIF pool and provider IDs
+        if: inputs.bootstrap_only
+        run: |
+          set -euo pipefail
+          BOOTSTRAP_TF="terraform-bootstrap/envs/dev/main.tf"
+
+          POOL=$(awk -F'"' '/workload_identity_pool_id/ { print $2; exit }' "$BOOTSTRAP_TF")
+          PROVIDER=$(awk -F'"' '/workload_identity_provider_id/ { print $2; exit }' "$BOOTSTRAP_TF")
+
+          if [[ ! "$POOL" =~ ^tfe-pool-dev-[0-9]+$ ]]; then
+            echo "FAIL: unexpected pool id: ${POOL}"
+            exit 1
+          fi
+          if [[ ! "$PROVIDER" =~ ^tfe-provider-dev-[0-9]+$ ]]; then
+            echo "FAIL: unexpected provider id: ${PROVIDER}"
+            exit 1
+          fi
+
+          POOL_N="${POOL##*-}"
+          NEXT=$((POOL_N + 1))
+
+          sed -i "s/${POOL}/tfe-pool-dev-${NEXT}/" "$BOOTSTRAP_TF"
+          sed -i "s/${PROVIDER}/tfe-provider-dev-${NEXT}/" "$BOOTSTRAP_TF"
+
+          echo "bootstrap WIF bump:"
+          echo "  ${POOL} -> tfe-pool-dev-${NEXT}"
+          echo "  ${PROVIDER} -> tfe-provider-dev-${NEXT}"
+          echo "No TFC_GCP_* variables copied."
+
+      - name: Create branch and open PR (bootstrap only)
+        if: inputs.bootstrap_only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASE="${{ inputs.base_branch }}"
+          BRANCH="bump/bootstrap-wif-dev-$(date +%Y%m%d%H%M%S)"
+          BOOTSTRAP_TF="terraform-bootstrap/envs/dev/main.tf"
+
+          if git diff --quiet -- "$BOOTSTRAP_TF"; then
+            echo "No bootstrap changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "$BOOTSTRAP_TF"
+          git commit -m "$(cat <<EOF
+Bump bootstrap WIF pool/provider IDs (dev).
+
+Rotates tfe-pool-dev-* and tfe-provider-dev-* in terraform-bootstrap/envs/dev.
+Does not copy TFC_GCP_* workspace variables.
+Apply GCP-Vaflt-Bootstrap after merge, then update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-VAFLT-TFE-WORK if needed.
+EOF
+)"
+          git push origin "$BRANCH"
+
+          gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "Bump bootstrap WIF pool/provider (dev)" \
+            --body "$(cat <<EOF
+## Summary
+- Bumps \`workload_identity_pool_id\` and \`workload_identity_provider_id\` in \`terraform-bootstrap/envs/dev/main.tf\`
+- **Does not** copy \`TFC_GCP_*\` env vars to the platform workspace
+
+## After merge
+1. Apply **GCP-Vaflt-Bootstrap**
+2. Update \`TFC_GCP_WORKLOAD_PROVIDER_NAME\` on **GCP-VAFLT-TFE-WORK** from bootstrap outputs (if needed)
+3. Re-run platform apply on **GCP-VAFLT-TFE-WORK**
+EOF
+)"
 
       - name: Copy TFC_GCP auth variables
+        if: ${{ !inputs.bootstrap_only }}
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
         run: |
@@ -36,7 +119,7 @@ jobs:
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
           BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
-          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
+          WORKLOAD_NAME="GCP-VAFLT-TFE-WORK"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
@@ -152,12 +235,13 @@ jobs:
           echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
 
       - name: Bump dev resource suffix
+        if: ${{ !inputs.bootstrap_only }}
         env:
           TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
-          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
+          WORKLOAD_NAME="GCP-VAFLT-TFE-WORK"
           API="https://app.terraform.io/api/v2"
 
           if [ -z "${TFE_TOKEN:-}" ]; then
@@ -220,6 +304,7 @@ jobs:
           echo "  bucket-*-tfe-dev-workload-${BUCKET_SUFFIX}"
 
       - name: Commit and push suffix bump
+        if: ${{ !inputs.bootstrap_only }}
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
