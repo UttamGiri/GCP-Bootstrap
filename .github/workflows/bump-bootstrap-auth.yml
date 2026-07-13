@@ -1,26 +1,14 @@
 name: Bump Bootstrap Auth
 
-# Modes (workflow_dispatch):
-# - bootstrap_only=true: bump terraform-bootstrap WIF IDs, create branch + PR to base_branch.
-#   Does NOT copy TFC_GCP_* env vars. Does NOT bump resource_suffix.
-# - bootstrap_only=false (legacy): copy auth vars + bump resource_suffix when state empty.
-#
-# GitHub secret: TFE_TOKEN (legacy mode only)
+# Bumps bootstrap WIF pool/provider IDs in terraform-bootstrap/envs/dev,
+# creates a branch, and opens a PR to feature/new-bootstrap.
+# Does NOT copy TFC_GCP_* env vars to GCP-vaflt-tfe-workspace.
 
 on:
   workflow_dispatch:
-    inputs:
-      bootstrap_only:
-        description: "Bootstrap WIF bump only — new branch + PR, no TFC var copy"
-        type: boolean
-        default: true
-      base_branch:
-        description: "Base branch for bootstrap-only PR"
-        type: string
-        default: feature/new-bootstrap
 
 env:
-  GIT_BRANCH: feature/new-bootstrap
+  BASE_BRANCH: feature/new-bootstrap
 
 permissions:
   contents: write
@@ -28,17 +16,16 @@ permissions:
 
 jobs:
   bump-bootstrap-auth:
-    name: Bootstrap auth bump
+    name: Bump bootstrap WIF and open PR
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.bootstrap_only && inputs.base_branch || env.GIT_BRANCH }}
+          ref: ${{ env.BASE_BRANCH }}
 
       - name: Bump bootstrap WIF pool and provider IDs
-        if: inputs.bootstrap_only
         run: |
           set -euo pipefail
           BOOTSTRAP_TF="terraform-bootstrap/envs/dev/main.tf"
@@ -64,15 +51,13 @@ jobs:
           echo "bootstrap WIF bump:"
           echo "  ${POOL} -> tfe-pool-dev-${NEXT}"
           echo "  ${PROVIDER} -> tfe-provider-dev-${NEXT}"
-          echo "No TFC_GCP_* variables copied."
 
-      - name: Create branch and open PR (bootstrap only)
-        if: inputs.bootstrap_only
+      - name: Create branch and open PR
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          BASE="${{ inputs.base_branch }}"
+          BASE="${{ env.BASE_BRANCH }}"
           BRANCH="bump/bootstrap-wif-dev-$(date +%Y%m%d%H%M%S)"
           BOOTSTRAP_TF="terraform-bootstrap/envs/dev/main.tf"
 
@@ -88,225 +73,11 @@ jobs:
           git commit \
             -m "Bump bootstrap WIF pool/provider IDs (dev)." \
             -m "Rotates tfe-pool-dev-* and tfe-provider-dev-* in terraform-bootstrap/envs/dev." \
-            -m "Does not copy TFC_GCP_* workspace variables." \
             -m "Apply GCP-Vaflt-Bootstrap after merge, then update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace if needed."
           git push origin "$BRANCH"
 
-          PR_BODY="## Summary"$'\n'"- Bumps workload_identity_pool_id and workload_identity_provider_id in terraform-bootstrap/envs/dev/main.tf"$'\n'"- Does not copy TFC_GCP_* env vars to the platform workspace"$'\n\n'"## After merge"$'\n'"1. Apply GCP-Vaflt-Bootstrap"$'\n'"2. Update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace from bootstrap outputs (if needed)"$'\n'"3. Re-run platform apply on GCP-vaflt-tfe-workspace"
+          PR_BODY="## Summary"$'\n'"- Bumps workload_identity_pool_id and workload_identity_provider_id in terraform-bootstrap/envs/dev/main.tf"$'\n\n'"## After merge"$'\n'"1. Apply GCP-Vaflt-Bootstrap"$'\n'"2. Update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace from bootstrap outputs (if needed)"$'\n'"3. Re-run platform apply on GCP-vaflt-tfe-workspace"
 
           gh pr create --base "$BASE" --head "$BRANCH" \
             --title "Bump bootstrap WIF pool/provider (dev)" \
             --body "$PR_BODY"
-
-      - name: Copy TFC_GCP auth variables
-        if: ${{ !inputs.bootstrap_only }}
-        env:
-          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          TFE_HOSTNAME="app.terraform.io"
-          TFE_ORG="vaflt-org"
-          BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
-          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
-          API="https://${TFE_HOSTNAME}/api/v2"
-
-          auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
-
-          if [ -z "${TFE_TOKEN:-}" ]; then
-            echo "Missing secret TFE_TOKEN"
-            exit 1
-          fi
-
-          resolve_workspace_id() {
-            local name="$1" resp http_code body id
-            resp=$(curl -sS -w "\n__HTTP__%{http_code}" --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/organizations/${TFE_ORG}/workspaces/${name}")
-            http_code="${resp##*__HTTP__}"
-            body="${resp%__HTTP__*}"
-
-            if [ "$http_code" = "401" ]; then
-              echo "FAIL: TFE API 401 unauthorized — update GitHub secret TFE_TOKEN" >&2
-              echo "Create a token: https://app.terraform.io/app/settings/tokens" >&2
-              return 1
-            fi
-
-            id=$(echo "$body" | jq -r '.data.id // empty')
-            if [ -z "$id" ]; then
-              echo "FAIL: workspace '${name}' not found in org '${TFE_ORG}' (HTTP ${http_code})" >&2
-              echo "$body" | jq -r '.errors[]? | "\(.status) \(.title): \(.detail // .title)"' >&2
-              return 1
-            fi
-            echo "$id"
-          }
-
-          read_env_var() {
-            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/workspaces/$1/vars?page%5Bsize%5D=100" \
-              | jq -r --arg k "$2" '
-                  [.data[]? | select(.attributes.key == $k and .attributes.category == "env")][0].attributes.value // empty
-                '
-          }
-
-          read_output() {
-            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/workspaces/$1/current-state-version-outputs" \
-              | jq -r --arg k "$2" '
-                  [.data[]? | select(.attributes.name == $k)][0].attributes.value
-                  | if . == null then empty elif type == "string" then . else tostring end
-                '
-          }
-
-          upsert_env_var() {
-            local ws_id="$1" key="$2" value="$3" existing_id
-            existing_id=$(curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/workspaces/${ws_id}/vars?page%5Bsize%5D=100" \
-              | jq -r --arg k "$key" '
-                  [.data[]? | select(.attributes.key == $k and .attributes.category == "env")][0].id // empty
-                ')
-            if [ -n "$existing_id" ]; then
-              curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-                --request PATCH \
-                --data "$(jq -n --arg val "$value" '{data:{type:"vars",attributes:{value:$val}}}')" \
-                "${API}/vars/${existing_id}" >/dev/null
-            else
-              curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-                --request POST \
-                --data "$(jq -n --arg key "$key" --arg val "$value" '{
-                  data:{type:"vars",attributes:{key:$key,value:$val,category:"env",hcl:false,sensitive:false}}
-                }')" \
-                "${API}/workspaces/${ws_id}/vars" >/dev/null
-            fi
-            echo "  set ${key}"
-          }
-
-          resolve_auth_value() {
-            local ws_id="$1" env_key="$2" output_key="$3" value
-            value=$(read_env_var "$ws_id" "$env_key")
-            if [ -z "$value" ] || [ "$value" = "null" ]; then
-              value=$(read_output "$ws_id" "$output_key")
-            fi
-            printf '%s' "$value"
-          }
-
-          echo "=== Copy bootstrap auth to workload ==="
-
-          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME") || exit 1
-          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME") || exit 1
-
-          echo "Bootstrap: ${BOOTSTRAP_NAME} (${BOOTSTRAP_ID})"
-          echo "Workload:  ${WORKLOAD_NAME} (${WORKLOAD_ID})"
-
-          SA_EMAIL=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")
-          WIF_PROVIDER=$(resolve_auth_value "$BOOTSTRAP_ID" \
-            "TFC_GCP_WORKLOAD_PROVIDER_NAME" "TFC_GCP_WORKLOAD_PROVIDER_NAME")
-
-          if [ -z "$SA_EMAIL" ] || [ "$SA_EMAIL" = "null" ]; then
-            echo "FAIL: bootstrap SA email missing"
-            exit 1
-          fi
-          if [ -z "$WIF_PROVIDER" ] || [ "$WIF_PROVIDER" = "null" ]; then
-            echo "FAIL: bootstrap WIF provider missing"
-            exit 1
-          fi
-
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PROVIDER_AUTH" "true"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_PRINCIPAL_TYPE" "service_account"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_AUTH_IDENTITY" "bootstrap"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "$SA_EMAIL"
-          upsert_env_var "$WORKLOAD_ID" "TFC_GCP_WORKLOAD_PROVIDER_NAME" "$WIF_PROVIDER"
-
-          echo ""
-          echo "Done:"
-          echo "  TFC_GCP_AUTH_IDENTITY=bootstrap"
-          echo "  TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL=${SA_EMAIL}"
-          echo "  TFC_GCP_WORKLOAD_PROVIDER_NAME=${WIF_PROVIDER}"
-
-      - name: Bump dev resource suffix
-        if: ${{ !inputs.bootstrap_only }}
-        env:
-          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
-        run: |
-          set -euo pipefail
-          MAIN_TF="tfe-workspace/envs/dev/main.tf"
-          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
-          API="https://app.terraform.io/api/v2"
-
-          if [ -z "${TFE_TOKEN:-}" ]; then
-            echo "Missing secret TFE_TOKEN — cannot read workspace state"
-            exit 1
-          fi
-
-          WORKLOAD_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
-            --header "Content-Type: application/vnd.api+json" \
-            "${API}/organizations/vaflt-org/workspaces/${WORKLOAD_NAME}" \
-            | jq -r '.data.id // empty')
-          if [ -z "$WORKLOAD_ID" ]; then
-            echo "FAIL: workload workspace not found"
-            exit 1
-          fi
-
-          SV_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
-            --header "Content-Type: application/vnd.api+json" \
-            "${API}/workspaces/${WORKLOAD_ID}" \
-            | jq -r '.data.relationships["current-state-version"].data.id // empty')
-          if [ -z "$SV_ID" ]; then
-            echo "SKIP: no state version — bump when destroy leaves empty state"
-            exit 0
-          fi
-
-          STATE_URL=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
-            --header "Content-Type: application/vnd.api+json" \
-            "${API}/state-versions/${SV_ID}" \
-            | jq -r '.data.attributes["hosted-state-download-url"] // empty')
-          if [ -z "$STATE_URL" ]; then
-            echo "FAIL: could not get state download URL"
-            exit 1
-          fi
-
-          MANAGED_COUNT=$(curl -sS "$STATE_URL" \
-            | jq '[.resources[]? | select(.mode == "managed")] | length')
-          echo "managed resources in state: ${MANAGED_COUNT}"
-
-          if [ "$MANAGED_COUNT" != "0" ]; then
-            echo "SKIP: state not empty (${MANAGED_COUNT} managed) — run destroy first"
-            exit 0
-          fi
-
-          CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
-          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-            echo "FAIL: could not parse resource_suffix from ${MAIN_TF} (got: ${CURRENT:-empty})"
-            exit 1
-          fi
-
-          NEXT=$((CURRENT + 1))
-          sed -i "/^[[:space:]]*resource_suffix[[:space:]]*=/ s/\"${CURRENT}\"/\"${NEXT}\"/" "$MAIN_TF"
-
-          BUCKET_SUFFIX=$(awk -F'"' '/^[[:space:]]*bucket_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
-          echo "resource_suffix: ${CURRENT} -> ${NEXT}"
-          echo "bucket_suffix: ${BUCKET_SUFFIX} (unchanged)"
-          echo "Next apply will create:"
-          echo "  gcp-tfe-workspace-sa-${NEXT}"
-          echo "  tfe-workspace-pool-${NEXT}"
-          echo "  tfe-workspace-provider-${NEXT}"
-          echo "  bucket-*-tfe-dev-workload-${BUCKET_SUFFIX}"
-
-      - name: Commit and push suffix bump
-        if: ${{ !inputs.bootstrap_only }}
-        run: |
-          set -euo pipefail
-          MAIN_TF="tfe-workspace/envs/dev/main.tf"
-
-          if ! git diff --quiet -- "$MAIN_TF"; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add "$MAIN_TF"
-            git commit \
-              -m "Bump dev workload resource_suffix after destroy." \
-              -m "Rotates SA and WIF pool/provider names to avoid GCP soft-delete 409s on the next apply. Bucket suffix is unchanged."
-            git pull --rebase origin "${{ env.GIT_BRANCH }}"
-            git push origin "${{ env.GIT_BRANCH }}"
-          else
-            echo "No suffix change to commit (bump skipped or unchanged)"
-          fi
