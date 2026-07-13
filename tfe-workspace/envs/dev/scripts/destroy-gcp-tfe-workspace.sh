@@ -143,7 +143,7 @@ finish_destroy() {
   echo "Copying bootstrap auth..."
   copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
   echo ""
-  echo "Next: run GitHub Actions workflow 'Bump Bootstrap Auth' to bump resource_suffix (+1) for SA/WIF only."
+  echo "Next: run GitHub Actions workflow 'Bump TFE Auth' to bump resource_suffix (+1) for SA/WIF only."
   exit 0
 }
 
@@ -151,7 +151,7 @@ if [ "$resource_count" = "0" ]; then
   echo "State empty — copying bootstrap auth only."
   copy_bootstrap_auth "$BOOTSTRAP_ID" "$WORKLOAD_ID"
   echo ""
-  echo "Next: run GitHub Actions workflow 'Bump Bootstrap Auth' to bump resource_suffix (+1) for SA/WIF only."
+  echo "Next: run GitHub Actions workflow 'Bump TFE Auth' to bump resource_suffix (+1) for SA/WIF only."
   exit 0
 fi
 
