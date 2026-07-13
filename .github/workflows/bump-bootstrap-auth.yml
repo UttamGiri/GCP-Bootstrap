@@ -78,6 +78,16 @@ jobs:
 
           PR_BODY="## Summary"$'\n'"- Bumps workload_identity_pool_id and workload_identity_provider_id in terraform-bootstrap/envs/dev/main.tf"$'\n\n'"## After merge"$'\n'"1. Apply GCP-Vaflt-Bootstrap"$'\n'"2. Update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace from bootstrap outputs (if needed)"$'\n'"3. Re-run platform apply on GCP-vaflt-tfe-workspace"
 
-          gh pr create --base "$BASE" --head "$BRANCH" \
+          PR_URL="https://github.com/${{ github.repository }}/compare/${BASE}...${BRANCH}?expand=1"
+
+          if gh pr create --base "$BASE" --head "$BRANCH" \
             --title "Bump bootstrap WIF pool/provider (dev)" \
-            --body "$PR_BODY"
+            --body "$PR_BODY" 2>/dev/null; then
+            echo "Pull request created."
+          else
+            echo ""
+            echo "Branch pushed. Open PR manually (Actions cannot create PRs until enabled in repo settings):"
+            echo "  Settings → Actions → General → Allow GitHub Actions to create and approve pull requests"
+            echo ""
+            echo "  ${PR_URL}"
+          fi
