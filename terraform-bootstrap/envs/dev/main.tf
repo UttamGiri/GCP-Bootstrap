@@ -36,9 +36,9 @@ module "bootstrap" {
     "ws-8nSCANEJTL1guUNk"
   ]
 
-  workload_identity_pool_id               = "tfe-pool-dev-3"
+  workload_identity_pool_id               = "tfe-pool-dev-4"
   workload_identity_pool_display_name     = "TFE Pool Dev"
-  workload_identity_provider_id           = "tfe-provider-dev-3"
+  workload_identity_provider_id           = "tfe-provider-dev-4"
   workload_identity_provider_display_name = "TFE OIDC Provider Dev"
 
   project_labels = {
