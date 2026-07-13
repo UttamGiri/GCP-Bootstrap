@@ -85,29 +85,18 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add "$BOOTSTRAP_TF"
-          git commit -m "$(cat <<EOF
-Bump bootstrap WIF pool/provider IDs (dev).
-
-Rotates tfe-pool-dev-* and tfe-provider-dev-* in terraform-bootstrap/envs/dev.
-Does not copy TFC_GCP_* workspace variables.
-Apply GCP-Vaflt-Bootstrap after merge, then update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-VAFLT-TFE-WORK if needed.
-EOF
-)"
+          git commit \
+            -m "Bump bootstrap WIF pool/provider IDs (dev)." \
+            -m "Rotates tfe-pool-dev-* and tfe-provider-dev-* in terraform-bootstrap/envs/dev." \
+            -m "Does not copy TFC_GCP_* workspace variables." \
+            -m "Apply GCP-Vaflt-Bootstrap after merge, then update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace if needed."
           git push origin "$BRANCH"
+
+          PR_BODY="## Summary"$'\n'"- Bumps workload_identity_pool_id and workload_identity_provider_id in terraform-bootstrap/envs/dev/main.tf"$'\n'"- Does not copy TFC_GCP_* env vars to the platform workspace"$'\n\n'"## After merge"$'\n'"1. Apply GCP-Vaflt-Bootstrap"$'\n'"2. Update TFC_GCP_WORKLOAD_PROVIDER_NAME on GCP-vaflt-tfe-workspace from bootstrap outputs (if needed)"$'\n'"3. Re-run platform apply on GCP-vaflt-tfe-workspace"
 
           gh pr create --base "$BASE" --head "$BRANCH" \
             --title "Bump bootstrap WIF pool/provider (dev)" \
-            --body "$(cat <<EOF
-## Summary
-- Bumps \`workload_identity_pool_id\` and \`workload_identity_provider_id\` in \`terraform-bootstrap/envs/dev/main.tf\`
-- **Does not** copy \`TFC_GCP_*\` env vars to the platform workspace
-
-## After merge
-1. Apply **GCP-Vaflt-Bootstrap**
-2. Update \`TFC_GCP_WORKLOAD_PROVIDER_NAME\` on **GCP-VAFLT-TFE-WORK** from bootstrap outputs (if needed)
-3. Re-run platform apply on **GCP-VAFLT-TFE-WORK**
-EOF
-)"
+            --body "$PR_BODY"
 
       - name: Copy TFC_GCP auth variables
         if: ${{ !inputs.bootstrap_only }}
@@ -119,7 +108,7 @@ EOF
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
           BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
-          WORKLOAD_NAME="GCP-VAFLT-TFE-WORK"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
@@ -241,7 +230,7 @@ EOF
         run: |
           set -euo pipefail
           MAIN_TF="tfe-workspace/envs/dev/main.tf"
-          WORKLOAD_NAME="GCP-VAFLT-TFE-WORK"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://app.terraform.io/api/v2"
 
           if [ -z "${TFE_TOKEN:-}" ]; then
