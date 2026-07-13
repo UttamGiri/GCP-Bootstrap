@@ -24,7 +24,7 @@ data "terraform_remote_state" "bootstrap" {
 locals {
   project_id = data.terraform_remote_state.bootstrap.outputs.bootstrap_project_id
   # Bumped by bump-tfe-auth after failed apply/destroy cycle (was 8 → 9).
-  resource_suffix = "15"
+  resource_suffix = "16"
   # Fixed — never bumped; bucket names are reusable after destroy (soft delete disabled).
   bucket_suffix = "1"
 }
