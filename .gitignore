@@ -6,8 +6,6 @@
 terraform-state-export.tfstate
 state-version.json
 */state-version.json
-info.txt
-*/info.txt
 crash.log
 *.tfvars
 *.jpeg
