@@ -1,0 +1,117 @@
+name: Bump TFE Auth
+
+# Bumps resource_suffix in tfe-workspace/envs/dev (+1) to rotate workload SA/WIF names.
+# Creates branch bump-tfe-auth-* and opens PR to feature/new-bootstrap.
+# Does NOT copy TFC_GCP_* env vars. Does NOT change terraform-bootstrap.
+
+on:
+  workflow_dispatch:
+
+env:
+  BASE_BRANCH: feature/new-bootstrap
+  WORKLOAD_NAME: GCP-vaflt-tfe-workspace
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-tfe-auth:
+    name: Bump TFE resource_suffix and open PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+
+      - name: Bump TFE resource_suffix
+        env:
+          TFE_TOKEN: ${{ secrets.TFE_TOKEN }}
+        run: |
+          set -euo pipefail
+          MAIN_TF="tfe-workspace/envs/dev/main.tf"
+
+          CURRENT=$(awk -F'"' '/^[[:space:]]*resource_suffix[[:space:]]*=/ { print $2; exit }' "$MAIN_TF")
+          if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+            echo "FAIL: could not parse resource_suffix from ${MAIN_TF} (got: ${CURRENT:-empty})"
+            exit 1
+          fi
+
+          if [ -n "${TFE_TOKEN:-}" ]; then
+            API="https://app.terraform.io/api/v2"
+            WORKLOAD_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+              --header "Content-Type: application/vnd.api+json" \
+              "${API}/organizations/vaflt-org/workspaces/${WORKLOAD_NAME}" \
+              | jq -r '.data.id // empty')
+            if [ -n "$WORKLOAD_ID" ]; then
+              SV_ID=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+                --header "Content-Type: application/vnd.api+json" \
+                "${API}/workspaces/${WORKLOAD_ID}" \
+                | jq -r '.data.relationships["current-state-version"].data.id // empty')
+              if [ -n "$SV_ID" ]; then
+                STATE_URL=$(curl -sS --header "Authorization: Bearer ${TFE_TOKEN}" \
+                  --header "Content-Type: application/vnd.api+json" \
+                  "${API}/state-versions/${SV_ID}" \
+                  | jq -r '.data.attributes["hosted-state-download-url"] // empty')
+                if [ -n "$STATE_URL" ]; then
+                  MANAGED_COUNT=$(curl -sS "$STATE_URL" \
+                    | jq '[.resources[]? | select(.mode == "managed")] | length')
+                  echo "managed resources in ${WORKLOAD_NAME} state: ${MANAGED_COUNT}"
+                  if [ "$MANAGED_COUNT" != "0" ]; then
+                    echo "SKIP: state not empty — run destroy first"
+                    exit 0
+                  fi
+                fi
+              fi
+            fi
+          else
+            echo "TFE_TOKEN not set — skipping state empty check"
+          fi
+
+          NEXT=$((CURRENT + 1))
+          sed -i "/^[[:space:]]*resource_suffix[[:space:]]*=/ s/\"${CURRENT}\"/\"${NEXT}\"/" "$MAIN_TF"
+
+          echo "TFE auth bump:"
+          echo "  resource_suffix: ${CURRENT} -> ${NEXT}"
+          echo "  gcp-tfe-workspace-sa-${NEXT}"
+          echo "  tfe-workspace-pool-${NEXT}"
+          echo "  tfe-workspace-provider-${NEXT}"
+
+      - name: Create branch and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BASE="${{ env.BASE_BRANCH }}"
+          BRANCH="bump-tfe-auth-$(date +%Y%m%d%H%M%S)"
+          MAIN_TF="tfe-workspace/envs/dev/main.tf"
+
+          if git diff --quiet -- "$MAIN_TF"; then
+            echo "No TFE auth changes to commit (bump skipped or unchanged)"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add "$MAIN_TF"
+          git commit \
+            -m "Bump TFE workload resource_suffix after destroy." \
+            -m "Rotates gcp-tfe-workspace-sa-* and tfe-workspace-pool/provider-* in GCP-vaflt-tfe-workspace."
+          git push origin "$BRANCH"
+
+          PR_BODY="## Summary"$'\n'"- Bumps resource_suffix in tfe-workspace/envs/dev/main.tf"$'\n'"- Rotates workload SA + WIF pool/provider names for GCP-vaflt-tfe-workspace"$'\n\n'"## After merge"$'\n'"1. Re-apply GCP-vaflt-tfe-workspace"$'\n'"2. Run TFE Sync Workload Auth if env vars need updating from outputs"
+
+          PR_URL="https://github.com/${{ github.repository }}/compare/${BASE}...${BRANCH}?expand=1"
+
+          if gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "Bump TFE auth resource_suffix (dev)" \
+            --body "$PR_BODY" 2>/dev/null; then
+            echo "Pull request created."
+          else
+            echo ""
+            echo "Branch pushed. Open PR manually:"
+            echo "  ${PR_URL}"
+          fi
