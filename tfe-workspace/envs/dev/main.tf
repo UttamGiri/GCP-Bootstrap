@@ -6,8 +6,9 @@ terraform {
       source  = "hashicorp/google"
       # DEMO: pinned OLD provider to reproduce "newer provider version" error on TFE
       # when state was written with a newer google provider (e.g. 5.45.2).
+      # Must be >= 5.15 (soft_delete_policy) but below state writer version.
       # Revert to "~> 5.0" and run "terraform init -upgrade" to fix.
-      version = "5.10.0"
+      version = "5.30.0"
     }
   }
 }
