@@ -3,10 +3,9 @@ terraform {
 
   required_providers {
     google = {
-      source = "hashicorp/google"
-      # ~> 5.0 allows any 5.x (>= 5.0, < 6.0). "terraform init -upgrade" resolves
-      # to the latest matching release; .terraform.lock.hcl pins that exact version
-      # so TFE and local runs use the same provider until you upgrade the lock again.
+      # EXPERIMENT: test a root-level switch to google-beta in TFE.
+      # The nested modules still require hashicorp/google.
+      source  = "hashicorp/google-beta"
       version = "~> 5.0"
     }
   }
