@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google-beta"
-      version = "~> 5.0"
-    }
-  }
-}
-
 module "storage_buckets" {
   source = "../gcs-buckets"
 

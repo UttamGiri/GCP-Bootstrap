@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google-beta"
-      version = "~> 5.0"
-    }
-  }
-}
-
 variable "project_id" {
   description = "GCP project ID where buckets are created"
   type        = string

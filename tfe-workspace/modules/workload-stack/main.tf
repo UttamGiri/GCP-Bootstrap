@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google-beta"
-      version = "~> 5.0"
-    }
-  }
-}
-
 # Do not add sibling modules here — add ephemeral resources inside workload-resources/.
 # This depends_on is the only destroy-order guard needed.
 
