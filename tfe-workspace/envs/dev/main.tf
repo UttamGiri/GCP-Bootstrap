@@ -4,7 +4,10 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "~> 5.0"
+      # DEMO: pinned OLD provider to reproduce "newer provider version" error on TFE
+      # when state was written with a newer google provider (e.g. 5.45.2).
+      # Revert to "~> 5.0" and run "terraform init -upgrade" to fix.
+      version = "5.10.0"
     }
   }
 }
