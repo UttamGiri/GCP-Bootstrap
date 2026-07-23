@@ -3,12 +3,11 @@ terraform {
 
   required_providers {
     google = {
-      source  = "hashicorp/google"
-      # DEMO: pinned OLD provider to reproduce "newer provider version" error on TFE
-      # when state was written with a newer google provider (e.g. 5.45.2).
-      # Must be >= 5.15 (soft_delete_policy) but below state writer version.
-      # Revert to "~> 5.0" and run "terraform init -upgrade" to fix.
-      version = "5.30.0"
+      source = "hashicorp/google"
+      # ~> 5.0 allows any 5.x (>= 5.0, < 6.0). "terraform init -upgrade" resolves
+      # to the latest matching release; .terraform.lock.hcl pins that exact version
+      # so TFE and local runs use the same provider until you upgrade the lock again.
+      version = "~> 5.0"
     }
   }
 }
