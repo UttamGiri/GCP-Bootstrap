@@ -6,7 +6,7 @@ TFE notifications and GitHub Actions are two different systems with different ru
 
 ## 1. TFE only gives you URL + Token
 
-In **GCP-tfe-workspace → Settings → Notifications**, TFE lets you configure:
+In **GCP-vaflt-tfe-workspace → Settings → Notifications**, TFE lets you configure:
 
 | Field | Purpose |
 |-------|---------|
@@ -19,7 +19,7 @@ When a run finishes, TFE **POSTs its own JSON**, for example:
 ```json
 {
   "run_id": "run-xxxxx",
-  "workspace_name": "GCP-tfe-workspace",
+  "workspace_name": "GCP-vaflt-tfe-workspace",
   "notifications": ["run:completed"]
 }
 ```
@@ -125,7 +125,7 @@ A small bridge service receives TFE’s webhook and calls GitHub’s API.
 
 ```mermaid
 flowchart LR
-  TFE[GCP-tfe-workspace\nrun:completed]
+  TFE[GCP-vaflt-tfe-workspace\nrun:completed]
   MW[Middleware\nPipedream / Cloud Function]
   GH[GitHub API\nrepository_dispatch]
   R[TFE Webhook Router]

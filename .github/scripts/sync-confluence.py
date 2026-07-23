@@ -198,7 +198,7 @@ def main() -> None:
     base_url = os.environ.get(
         "CONFLUENCE_BASE_URL", "https://vaflt.atlassian.net"
     ).strip()
-    email = os.environ.get("CONFLUENCE_EMAIL", "uttamgiri32@gmail.com").strip()
+    email = os.environ.get("CONFLUENCE_EMAIL", "uttamgiri32@vaflt.com").strip()
     token = os.environ.get("CONFLUENCE_API_TOKEN", "").strip()
 
     if not token:

@@ -12,14 +12,17 @@ terraform {
 }
 
 provider "google" {
-  project = "bootstrap-prj-500323"
+  project = "bootstrap-prj-501802"
 }
 
 module "bootstrap" {
   source = "../../modules/bootstrap"
 
-  project_id     = "bootstrap-prj-500323"
+  project_id     = "bootstrap-prj-501802"
   create_project = false
+  # vaflt.com org: 327947404107 — set when create_project=true:
+  # org_id          = "327947404107"
+  # billing_account = "01BC6F-241F9A-8762DE"
   project_name   = "Bootstrap Dev Project"
 
   bootstrap_service_account_name         = "bs-tfe-sa"
@@ -27,9 +30,9 @@ module "bootstrap" {
 
   oidc_issuer_uri = "https://app.terraform.io"
 
-  tfe_workspace_id = "ws-D2eEpkBSCE55LBq9"
+  tfe_workspace_id = "ws-MqdANNRijWaRBrMj" # GCP-Vaflt-Bootstrap
   additional_tfe_workspace_ids = [
-    "ws-2UNjJ7BXhV5ZnrAG",
+    "ws-4V97YqCc8p3GH3U9", # GCP-vaflt-tfe-workspace
     "ws-8nSCANEJTL1guUNk"
   ]
 

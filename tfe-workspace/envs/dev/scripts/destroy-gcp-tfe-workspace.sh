@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Destroy all resources in GCP-tfe-workspace and reset auth to GCP-Bootstrap.
+# Destroy all resources in GCP-vaflt-tfe-workspace and reset auth to GCP-Vaflt-Bootstrap.
 #
 # Usage:
 #   export TFE_TOKEN=<your TFE API token>
@@ -11,8 +11,8 @@ set -euo pipefail
 
 TFE_HOSTNAME="${TFE_HOSTNAME:-app.terraform.io}"
 TFE_ORG="${TFE_ORG:-vaflt-org}"
-WORKLOAD_NAME="${WORKLOAD_NAME:-GCP-tfe-workspace}"
-BOOTSTRAP_NAME="${BOOTSTRAP_NAME:-GCP-Bootstrap}"
+WORKLOAD_NAME="${WORKLOAD_NAME:-GCP-vaflt-tfe-workspace}"
+BOOTSTRAP_NAME="${BOOTSTRAP_NAME:-GCP-Vaflt-Bootstrap}"
 API="https://${TFE_HOSTNAME}/api/v2"
 
 auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
