@@ -1,13 +1,13 @@
 .DS_Store
 .terraform/
-.terraform.lock.hcl
+# Lock files: commit only the TFE dev root (do not touch terraform-bootstrap).
+**/.terraform.lock.hcl
+!tfe-workspace/envs/dev/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 terraform-state-export.tfstate
 state-version.json
 */state-version.json
-info.txt
-*/info.txt
 crash.log
 *.tfvars
 *.jpeg

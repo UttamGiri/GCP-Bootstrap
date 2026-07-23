@@ -8,9 +8,12 @@ name: TFE Switch Bootstrap Auth
 on:
   workflow_dispatch:
 
+env:
+  GIT_BRANCH: feature/new-bootstrap
+
 jobs:
   switch-bootstrap-auth:
-    name: Switch GCP-tfe-workspace → bootstrap auth
+    name: Switch GCP-vaflt-tfe-workspace → bootstrap auth
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,8 +27,8 @@ jobs:
 
           TFE_HOSTNAME="app.terraform.io"
           TFE_ORG="vaflt-org"
-          BOOTSTRAP_NAME="GCP-Bootstrap"
-          WORKLOAD_NAME="GCP-tfe-workspace"
+          BOOTSTRAP_NAME="GCP-Vaflt-Bootstrap"
+          WORKLOAD_NAME="GCP-vaflt-tfe-workspace"
           API="https://${TFE_HOSTNAME}/api/v2"
 
           auth() { echo "Authorization: Bearer ${TFE_TOKEN}"; }
@@ -36,9 +39,23 @@ jobs:
           fi
 
           resolve_workspace_id() {
-            curl -sS --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
-              "${API}/organizations/${TFE_ORG}/workspaces/$1" \
-              | jq -r '.data.id // empty'
+            local name="$1" resp http_code body id
+            resp=$(curl -sS -w "\n__HTTP__%{http_code}" --header "$(auth)" --header "Content-Type: application/vnd.api+json" \
+              "${API}/organizations/${TFE_ORG}/workspaces/${name}")
+            http_code="${resp##*__HTTP__}"
+            body="${resp%__HTTP__*}"
+
+            if [ "$http_code" = "401" ]; then
+              echo "FAIL: TFE API 401 unauthorized — update GitHub secret TFE_TOKEN" >&2
+              return 1
+            fi
+
+            id=$(echo "$body" | jq -r '.data.id // empty')
+            if [ -z "$id" ]; then
+              echo "FAIL: workspace '${name}' not found in org '${TFE_ORG}' (HTTP ${http_code})" >&2
+              return 1
+            fi
+            echo "$id"
           }
 
           read_env_var() {
@@ -90,12 +107,8 @@ jobs:
             printf '%s' "$value"
           }
 
-          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME")
-          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME")
-          if [ -z "$BOOTSTRAP_ID" ] || [ -z "$WORKLOAD_ID" ]; then
-            echo "FAIL: workspace not found"
-            exit 1
-          fi
+          BOOTSTRAP_ID=$(resolve_workspace_id "$BOOTSTRAP_NAME") || exit 1
+          WORKLOAD_ID=$(resolve_workspace_id "$WORKLOAD_NAME") || exit 1
 
           SA_EMAIL=$(resolve_auth_value "$BOOTSTRAP_ID" \
             "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL" "TFC_GCP_RUN_SERVICE_ACCOUNT_EMAIL")

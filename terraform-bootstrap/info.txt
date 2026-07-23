@@ -1,0 +1,5 @@
+
+export TFE_TOKEN='yDWWNn7yR4kCgw.atlasv1.qaCQkxPUH1GQ46zNSBJP2t16FOQ20YsKpswSdZcJUWBc1f0kTPPWfvb9sJXBjUYKyTk'
+export TFE_HOST='app.terraform.io'
+export WORKSPACE_ID='ws-D2eEpkBSCE55LBq9'
+test -n "$TFE_TOKEN" && echo "TFE_TOKEN_SET"
