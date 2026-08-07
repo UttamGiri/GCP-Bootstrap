@@ -94,6 +94,17 @@ Reserve non-overlapping address space for:
 3. Regional VPC subnets used by DNS forwarders, test workloads, and any future private services.
 4. VPN/Interconnect routing ranges.
 
+## Multi-team and project structure
+
+1. Use one Shared VPC host project per environment (`net-prod`, `net-nonprod`) owning the VPC, subnets, PSC endpoint, Cloud Router, hybrid connectivity, and Cloud DNS. Never share a host project across environments.
+2. Give each workload team its own service project, GCP service account, WIF subject binding, Vertex quotas, and budget. The network path is shared; identity and authorization are not.
+3. Onboarding the next team is then an IAM change only, with no corporate firewall, DNS, or BGP change. That is the main reason to share one path rather than build a VPC per team.
+4. Create **one PSC endpoint per environment**. It is a network entry point, not a per-team or per-service resource, and it serves every workload that can reach the VPC.
+5. Do not add endpoints for redundancy; availability comes from redundant tunnels/attachments and BGP. A second endpoint is justified only by a second API bundle (`all-apis` plus `vpc-sc`).
+6. Grant `roles/compute.networkUser` at subnet scope, never at host-project scope.
+7. Calling Vertex AI does not require the calling project to have a VPC. Subnets are needed only for Vertex features that attach to the network, such as Workbench, private custom training, and Vector Search.
+8. The corporate firewall permits IP/port flows only and performs no name resolution. Note the differing rule sources: Kong pod egress CIDRs to the PSC `/32` on 443, and corporate DNS resolvers to the Cloud DNS inbound IPs on 53.
+
 ## Key design decisions
 
 | Decision | Recommendation |
