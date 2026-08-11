@@ -5,6 +5,9 @@ locals {
   # The compute/dns/serviceusage roles are required by the vertex-psc module. They
   # are granted by the same run that needs them, so the first apply after adding
   # them must use the bootstrap identity.
+  # roles/compute.xpnAdmin and roles/orgpolicy.policyAdmin cannot be granted at
+  # project scope (API returns 400). Grant those at folder/org out of band if you
+  # enable Shared VPC host attach or enforce_model_allowlist.
   workspace_sa_roles = concat([
     "roles/viewer",
     "roles/storage.admin",
@@ -16,16 +19,10 @@ locals {
     "roles/compute.networkAdmin",
     "roles/compute.securityAdmin",
     "roles/dns.admin",
-    # Project-scoped xpnAdmin is enough to attach service projects to this host.
-    # Marking the project a host at all needs xpnAdmin at the org or folder level,
-    # which is why enable_shared_vpc_host defaults to false.
-    "roles/compute.xpnAdmin",
     ],
     # serviceAccountAdmin does not cover key creation, so only ask for this role
     # when keys are actually wanted.
     var.vertex_psc.create_sa_key ? ["roles/iam.serviceAccountKeyAdmin"] : [],
-    # Setting vertexai.allowedModels at project level needs orgpolicy.policy.set.
-    var.vertex_psc.enforce_model_allowlist ? ["roles/orgpolicy.policyAdmin"] : [],
   )
 }
 

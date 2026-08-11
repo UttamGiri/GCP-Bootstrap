@@ -86,10 +86,9 @@ module "workload" {
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ]
 
-    # Turning this on sets the vertexai.allowedModels org policy on the host and
-    # every service project, which restricts ALL Vertex AI use in them, not just
-    # calls through this endpoint. Needs roles/orgpolicy.policyAdmin.
-    enforce_model_allowlist = true
+    # Off until roles/orgpolicy.policyAdmin is granted at folder/org (cannot be
+    # granted at project scope). DNS allowlist still scopes the PSC path.
+    enforce_model_allowlist = false
 
     # Attach consumer projects here; each shares the one endpoint.
     #   app = {
