@@ -10,8 +10,12 @@ metadata-server credentials in this design.
 
 ## Architecture
 
+> Tip: if diagrams look dark on GitHub, switch the site to **Light** appearance
+> (profile → Settings → Appearance), or hard-refresh. GitHub’s dark mode can
+> override Mermaid colors even when the source uses a light theme.
+
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'secondaryColor': '#e6f4ea', 'secondaryTextColor': '#202124', 'tertiaryColor': '#fff8e1', 'tertiaryTextColor': '#202124', 'lineColor': '#5f6368', 'textColor': '#202124', 'clusterBkg': '#f8f9fa', 'clusterBorder': '#80868b', 'titleColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
+%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryTextColor': '#000000', 'secondaryTextColor': '#000000', 'tertiaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'clusterBkg': '#eeeeee', 'clusterBorder': '#666666', 'titleColor': '#000000', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     subgraph LOCAL["Local / on-premises network"]
         PC["Local PC<br/>client application or curl"]
@@ -48,20 +52,24 @@ flowchart LR
     API --> GEM
     API --> CLA
 
-    classDef shared fill:#e8f0fe,stroke:#1a73e8,color:#202124
-    classDef one fill:#fff3cd,stroke:#b06000,stroke-width:3px,color:#202124
-    classDef svc fill:#e6f4ea,stroke:#137333,color:#202124
-    classDef ext fill:#f1f3f4,stroke:#5f6368,color:#202124
+    classDef shared fill:#BBDEFB,stroke:#0D47A1,color:#000000
+    classDef one fill:#FFE082,stroke:#E65100,stroke-width:3px,color:#000000
+    classDef svc fill:#C8E6C9,stroke:#1B5E20,color:#000000
+    classDef ext fill:#E0E0E0,stroke:#424242,color:#000000
     class ZONE,POL,RTR shared
     class PSC one
     class PC,RES,POD,SECRET,OCPDNS svc
     class API,GEM,CLA ext
+    style LOCAL fill:#E8F5E9,stroke:#2E7D32,color:#000000
+    style OCP fill:#E8F5E9,stroke:#2E7D32,color:#000000
+    style HOST fill:#E3F2FD,stroke:#1565C0,color:#000000
+    style VPC fill:#F5F5F5,stroke:#616161,color:#000000
 ```
 
 ## Request path
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#e8f0fe', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'secondaryColor': '#e6f4ea', 'tertiaryColor': '#fff8e1', 'lineColor': '#5f6368', 'textColor': '#202124', 'actorBkg': '#e8f0fe', 'actorTextColor': '#202124', 'actorBorder': '#1a73e8', 'actorLineColor': '#5f6368', 'signalColor': '#202124', 'signalTextColor': '#202124', 'labelBoxBkgColor': '#ffffff', 'labelBoxBorderColor': '#80868b', 'labelTextColor': '#202124', 'loopTextColor': '#202124', 'noteBkgColor': '#fff8e1', 'noteTextColor': '#202124', 'noteBorderColor': '#f9ab00', 'activationBkgColor': '#e6f4ea', 'sequenceNumberColor': '#ffffff'}}}%%
+%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'mainBkg': '#BBDEFB', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'actorBkg': '#BBDEFB', 'actorTextColor': '#000000', 'actorBorder': '#0D47A1', 'actorLineColor': '#333333', 'signalColor': '#000000', 'signalTextColor': '#000000', 'labelTextColor': '#000000', 'loopTextColor': '#000000', 'noteBkgColor': '#FFE082', 'noteTextColor': '#000000', 'noteBorderColor': '#F9A825', 'activationBkgColor': '#C8E6C9', 'sequenceNumberColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant C as Local PC or OpenShift pod
@@ -168,7 +176,7 @@ is layered:
 4. Claude Model Garden entitlement is required in every calling project.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'textColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
+%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     CALLER["Local PC or<br/>OpenShift pod"] --> DNS["DNS API allowlist"]
     DNS --> PSC["One PSC endpoint"]
@@ -177,9 +185,9 @@ flowchart LR
     POLICY --> OK["Gemini 2.5 Pro<br/>Claude Sonnet 5"]
     DNS -.->|"unapproved API: NXDOMAIN"| NO["Denied"]
     POLICY -.->|"unapproved model"| NO
-    classDef good fill:#e6f4ea,stroke:#137333,color:#202124
-    classDef bad fill:#fce8e6,stroke:#c5221f,color:#202124
-    classDef node fill:#e8f0fe,stroke:#1a73e8,color:#202124
+    classDef good fill:#C8E6C9,stroke:#1B5E20,color:#000000
+    classDef bad fill:#FFCDD2,stroke:#B71C1C,color:#000000
+    classDef node fill:#BBDEFB,stroke:#0D47A1,color:#000000
     class OK good
     class NO bad
     class CALLER,DNS,PSC,IAM,POLICY node
@@ -215,7 +223,7 @@ If you later enable private hybrid access:
 PSC answers **where** a request goes; a JWT identifies **who** made it.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'textColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
+%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     KEY[("Service-account key")]
     SIGN["Sign RS256 JWT locally"]
@@ -227,8 +235,8 @@ flowchart LR
     SIGN -->|"TOKEN_MODE=self-signed"| SELF --> PSC
     SIGN -->|"TOKEN_MODE=oauth"| EXCHANGE --> PSC
     PSC --> VERTEX
-    classDef node fill:#e8f0fe,stroke:#1a73e8,color:#202124
-    classDef one fill:#fff3cd,stroke:#b06000,color:#202124
+    classDef node fill:#BBDEFB,stroke:#0D47A1,color:#000000
+    classDef one fill:#FFE082,stroke:#E65100,color:#000000
     class KEY,SIGN,SELF,EXCHANGE,VERTEX node
     class PSC one
 ```
