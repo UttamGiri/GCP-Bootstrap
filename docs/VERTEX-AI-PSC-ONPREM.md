@@ -283,8 +283,7 @@ vertex_psc = {
   # Terraform creates these Shared VPC subnets for DNS inbound forwarders and
   # future hybrid use; they are not GCE test-VM landing zones.
   subnets = {
-    primary   = { region = "us-central1", cidr = "10.10.0.0/24" }
-    secondary = { region = "europe-west1", cidr = "10.10.1.0/24" }
+    primary = { region = "us-central1", cidr = "10.10.0.0/24" }
   }
   psc_endpoint_ip = "10.10.100.5"
 

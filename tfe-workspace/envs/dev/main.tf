@@ -59,18 +59,17 @@ module "workload" {
     # leave false and run: gcloud compute shared-vpc enable <host project>
     enable_shared_vpc_host = false
 
-    # One global endpoint covers every region, so subnets exist only to give
-    # workloads somewhere to run. The endpoint IP sits outside all of them.
+    # One global endpoint covers every region, so subnets exist only for DNS
+    # inbound forwarders / future hybrid use. The endpoint IP sits outside them.
     subnets = {
-      primary   = { region = "us-central1", cidr = "10.10.0.0/24" }
-      secondary = { region = "europe-west1", cidr = "10.10.1.0/24" }
+      primary = { region = "us-central1", cidr = "10.10.0.0/24" }
     }
     psc_endpoint_ip = "10.10.100.5"
 
     # One endpoint fronts every Google API, so DNS is what keeps it scoped to
     # Vertex AI: only these names resolve to it, and anything else under
-    # googleapis.com does not resolve at all from this VPC. Regional Vertex hosts
-    # for us-central1 and europe-west1 are added automatically.
+    # googleapis.com does not resolve at all from this VPC. The regional Vertex
+    # host for us-central1 is added automatically from the subnet list.
     #
     # oauth2/sts are only needed for the JWT token exchange. Drop them and use
     # TOKEN_MODE=self-signed for an aiplatform-only allowlist.
