@@ -5,7 +5,7 @@ Markdown under `docs/` can be published to Confluence automatically via GitHub A
 ## How it works 
 
 ```mermaid
-flowchart LR broken
+flowchart LR
   A[Edit docs/*.md] --> B[Push to GitHub]
   B --> C[Confluence Docs Sync workflow]
   C --> D[Read page-mapping.json]

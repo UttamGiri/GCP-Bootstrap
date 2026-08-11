@@ -13,3 +13,12 @@ output "bucket_names" {
 output "bucket_urls" {
   value = module.workload_resources.bucket_urls
 }
+
+output "vertex_psc" {
+  value = module.workload_resources.vertex_psc
+}
+
+output "vertex_psc_client_key_json" {
+  sensitive = true
+  value     = module.workload_resources.vertex_psc_client_key_json
+}
