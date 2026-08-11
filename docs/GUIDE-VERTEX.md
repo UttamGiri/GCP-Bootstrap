@@ -97,11 +97,11 @@ curl -sS -X POST \
 ### Step 5 — Call Claude (optional; enable Model Garden first)
 
 In the Cloud Console for `bootstrap-prj-501802`: Vertex AI → Model Garden →
-Claude Sonnet 5 → enable / accept terms.
+Claude Sonnet 4.5 → enable / accept terms.
 
 ```bash
 curl -sS -X POST \
-  "https://aiplatform.googleapis.com/v1/projects/${CALLING_PROJECT}/locations/global/publishers/anthropic/models/claude-sonnet-5:rawPredict" \
+  "https://aiplatform.googleapis.com/v1/projects/${CALLING_PROJECT}/locations/global/publishers/anthropic/models/claude-sonnet-4-5:rawPredict" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -399,12 +399,14 @@ Any other `*.googleapis.com` name gets **NXDOMAIN** inside this private zone
 | Model | Path | Method |
 |---|---|---|
 | Gemini 2.5 Pro | `publishers/google/models/gemini-2.5-pro` | `:generateContent` |
+| Claude Sonnet 4.5 | `publishers/anthropic/models/claude-sonnet-4-5` | `:rawPredict` |
 | Claude Sonnet 5 | `publishers/anthropic/models/claude-sonnet-5` | `:rawPredict` |
 
 Org-policy allowlist entries (when `enforce_model_allowlist = true`):
 
 ```text
 publishers/google/models/gemini-2.5-pro:predict
+publishers/anthropic/models/claude-sonnet-4-5:predict
 publishers/anthropic/models/claude-sonnet-5:predict
 ```
 

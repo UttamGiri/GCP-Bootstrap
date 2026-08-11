@@ -48,6 +48,7 @@ module "vertex_psc" {
   allow_all_google_apis = coalesce(var.vertex_psc.allow_all_google_apis, false)
   allowed_models = coalesce(var.vertex_psc.allowed_models, [
     "publishers/google/models/gemini-2.5-pro:predict",
+    "publishers/anthropic/models/claude-sonnet-4-5:predict",
     "publishers/anthropic/models/claude-sonnet-5:predict",
   ])
   enforce_model_allowlist = coalesce(var.vertex_psc.enforce_model_allowlist, false)

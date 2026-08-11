@@ -79,9 +79,10 @@ module "workload" {
       "sts.googleapis.com",
     ]
 
-    # The two approved models. Add entries as more are approved.
+    # Approved models. Add entries as more are approved.
     allowed_models = [
       "publishers/google/models/gemini-2.5-pro:predict",
+      "publishers/anthropic/models/claude-sonnet-4-5:predict",
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ]
 

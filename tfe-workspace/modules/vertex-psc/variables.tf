@@ -86,6 +86,7 @@ variable "allowed_models" {
   type        = list(string)
   default = [
     "publishers/google/models/gemini-2.5-pro:predict",
+    "publishers/anthropic/models/claude-sonnet-4-5:predict",
     "publishers/anthropic/models/claude-sonnet-5:predict",
   ]
 

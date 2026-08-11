@@ -67,6 +67,7 @@ variable "vertex_psc" {
     allow_all_google_apis = optional(bool, false)
     allowed_models = optional(list(string), [
       "publishers/google/models/gemini-2.5-pro:predict",
+      "publishers/anthropic/models/claude-sonnet-4-5:predict",
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ])
     enforce_model_allowlist = optional(bool, false)
