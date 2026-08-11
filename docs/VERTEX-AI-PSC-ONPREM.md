@@ -11,6 +11,7 @@ metadata-server credentials in this design.
 ## Architecture
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'secondaryColor': '#e6f4ea', 'secondaryTextColor': '#202124', 'tertiaryColor': '#fff8e1', 'tertiaryTextColor': '#202124', 'lineColor': '#5f6368', 'textColor': '#202124', 'clusterBkg': '#f8f9fa', 'clusterBorder': '#80868b', 'titleColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     subgraph LOCAL["Local / on-premises network"]
         PC["Local PC<br/>client application or curl"]
@@ -47,10 +48,10 @@ flowchart LR
     API --> GEM
     API --> CLA
 
-    classDef shared fill:#e8f0fe,stroke:#1a73e8
-    classDef one fill:#fce8b2,stroke:#b06000,stroke-width:3px
-    classDef svc fill:#e6f4ea,stroke:#137333
-    classDef ext fill:#f1f3f4,stroke:#5f6368
+    classDef shared fill:#e8f0fe,stroke:#1a73e8,color:#202124
+    classDef one fill:#fff3cd,stroke:#b06000,stroke-width:3px,color:#202124
+    classDef svc fill:#e6f4ea,stroke:#137333,color:#202124
+    classDef ext fill:#f1f3f4,stroke:#5f6368,color:#202124
     class ZONE,POL,RTR shared
     class PSC one
     class PC,RES,POD,SECRET,OCPDNS svc
@@ -60,6 +61,7 @@ flowchart LR
 ## Request path
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#e8f0fe', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'secondaryColor': '#e6f4ea', 'tertiaryColor': '#fff8e1', 'lineColor': '#5f6368', 'textColor': '#202124', 'actorBkg': '#e8f0fe', 'actorTextColor': '#202124', 'actorBorder': '#1a73e8', 'actorLineColor': '#5f6368', 'signalColor': '#202124', 'signalTextColor': '#202124', 'labelBoxBkgColor': '#ffffff', 'labelBoxBorderColor': '#80868b', 'labelTextColor': '#202124', 'loopTextColor': '#202124', 'noteBkgColor': '#fff8e1', 'noteTextColor': '#202124', 'noteBorderColor': '#f9ab00', 'activationBkgColor': '#e6f4ea', 'sequenceNumberColor': '#ffffff'}}}%%
 sequenceDiagram
     autonumber
     participant C as Local PC or OpenShift pod
@@ -166,6 +168,7 @@ is layered:
 4. Claude Model Garden entitlement is required in every calling project.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'textColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     CALLER["Local PC or<br/>OpenShift pod"] --> DNS["DNS API allowlist"]
     DNS --> PSC["One PSC endpoint"]
@@ -174,10 +177,12 @@ flowchart LR
     POLICY --> OK["Gemini 2.5 Pro<br/>Claude Sonnet 5"]
     DNS -.->|"unapproved API: NXDOMAIN"| NO["Denied"]
     POLICY -.->|"unapproved model"| NO
-    classDef good fill:#e6f4ea,stroke:#137333
-    classDef bad fill:#fce8e6,stroke:#c5221f
+    classDef good fill:#e6f4ea,stroke:#137333,color:#202124
+    classDef bad fill:#fce8e6,stroke:#c5221f,color:#202124
+    classDef node fill:#e8f0fe,stroke:#1a73e8,color:#202124
     class OK good
     class NO bad
+    class CALLER,DNS,PSC,IAM,POLICY node
 ```
 
 Set `enforce_model_allowlist = true` to manage `vertexai.allowedModels`. This is
@@ -210,6 +215,7 @@ If you later enable private hybrid access:
 PSC answers **where** a request goes; a JWT identifies **who** made it.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryColor': '#e8f0fe', 'primaryTextColor': '#202124', 'primaryBorderColor': '#1a73e8', 'lineColor': '#5f6368', 'textColor': '#202124', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart LR
     KEY[("Service-account key")]
     SIGN["Sign RS256 JWT locally"]
@@ -221,6 +227,10 @@ flowchart LR
     SIGN -->|"TOKEN_MODE=self-signed"| SELF --> PSC
     SIGN -->|"TOKEN_MODE=oauth"| EXCHANGE --> PSC
     PSC --> VERTEX
+    classDef node fill:#e8f0fe,stroke:#1a73e8,color:#202124
+    classDef one fill:#fff3cd,stroke:#b06000,color:#202124
+    class KEY,SIGN,SELF,EXCHANGE,VERTEX node
+    class PSC one
 ```
 
 Self-signed JWT is the default and avoids a dependency on the OAuth endpoint:
