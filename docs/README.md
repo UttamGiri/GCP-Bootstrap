@@ -9,6 +9,7 @@
 | [CONFLUENCE-DOCS-SYNC.md](CONFLUENCE-DOCS-SYNC.md) | Publish docs to Confluence via GitHub Actions (setup, secrets, page mapping) |
 | [VERTEX-AI-PSC-ONPREM.md](VERTEX-AI-PSC-ONPREM.md) | Shared VPC with one Private Service Connect endpoint for all projects; Gemini + Claude from on-prem or a local PC, authenticated with a service account JWT |
 | [GUIDE-VERTEX.md](GUIDE-VERTEX.md) | Operator guide: what was deployed, public vs PSC access, JWT scripts, OpenShift, outputs, troubleshooting |
+| [TEST-VERTEX.md](TEST-VERTEX.md) | One-page Vertex test runbook: impersonation, curl, scripts, Gemini vs Claude, PSC vs public |
 | [GUIDE-GKE-MULTIENV.md](GUIDE-GKE-MULTIENV.md) | Multi-zone GKE on Shared VPC: namespaces for dev/test, RBAC, static IPs, load balancers (PNG diagrams) |
 
 Module-specific READMEs remain next to their Terraform code (`terraform-bootstrap/`, `tfe-workspace/`).
