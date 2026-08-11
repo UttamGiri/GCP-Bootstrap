@@ -1,7 +1,7 @@
 # GCP Bootstrap Flow (Unified Stack)
 
 ```mermaid
-flowchart TD broken badly badly
+flowchart TD
     A[Bootstrap repo zip or git source]
     A --> B[Open Google Cloud Shell]
     B --> C[unzip/clone repo]
