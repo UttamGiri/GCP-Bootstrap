@@ -13,3 +13,5 @@ crash.log
 *.jpeg
 *.jpg
 *.png
+!docs/images/
+!docs/images/**/*.png

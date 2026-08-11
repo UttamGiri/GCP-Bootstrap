@@ -10,90 +10,14 @@ metadata-server credentials in this design.
 
 ## Architecture
 
-> Tip: if diagrams look dark on GitHub, switch the site to **Light** appearance
-> (profile → Settings → Appearance), or hard-refresh. GitHub’s dark mode can
-> override Mermaid colors even when the source uses a light theme.
+GitHub dark mode overrides live Mermaid colors, so these diagrams are committed
+as light PNG images (same labels as before).
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'mainBkg': '#ffffff', 'primaryTextColor': '#000000', 'secondaryTextColor': '#000000', 'tertiaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'clusterBkg': '#eeeeee', 'clusterBorder': '#666666', 'titleColor': '#000000', 'edgeLabelBackground': '#ffffff'}}}%%
-flowchart LR
-    subgraph LOCAL["Local / on-premises network"]
-        PC["Local PC<br/>client application or curl"]
-        RES["On-prem DNS resolver"]
-    end
-
-    subgraph OCP["OpenShift environment"]
-        POD["Application pod"]
-        SECRET["Kubernetes Secret<br/>service-account key"]
-        OCPDNS["OpenShift DNS<br/>or upstream resolver"]
-    end
-
-    subgraph HOST["HOST PROJECT - owns every shared resource"]
-        subgraph VPC["Shared VPC"]
-            PSC{{"ONE PSC ENDPOINT<br/>10.10.100.5<br/>target: all-apis"}}
-            ZONE["Private DNS zone googleapis.com<br/>A records only for allowed hosts<br/>everything else is NXDOMAIN"]
-            POL["Inbound DNS<br/>server policy"]
-            RTR["Cloud Router<br/>advertises 10.10.100.5/32"]
-        end
-    end
-
-    API(["aiplatform.googleapis.com"])
-    GEM["publishers/google<br/>gemini-2.5-pro<br/>generateContent"]
-    CLA["publishers/anthropic<br/>claude-sonnet-5<br/>rawPredict"]
-
-    RES -->|"forward googleapis.com"| POL
-    OCPDNS -->|"forward googleapis.com"| POL
-    POL --> ZONE
-    ZONE -.->|"resolves to"| PSC
-    PC -->|"HA VPN or Interconnect<br/>signed service-account JWT"| RTR
-    POD -->|"HA VPN or Interconnect<br/>signed service-account JWT"| RTR
-    SECRET --> POD
-    PSC ==>|"Google backbone"| API
-    API --> GEM
-    API --> CLA
-
-    classDef shared fill:#BBDEFB,stroke:#0D47A1,color:#000000
-    classDef one fill:#FFE082,stroke:#E65100,stroke-width:3px,color:#000000
-    classDef svc fill:#C8E6C9,stroke:#1B5E20,color:#000000
-    classDef ext fill:#E0E0E0,stroke:#424242,color:#000000
-    class ZONE,POL,RTR shared
-    class PSC one
-    class PC,RES,POD,SECRET,OCPDNS svc
-    class API,GEM,CLA ext
-    style LOCAL fill:#E8F5E9,stroke:#2E7D32,color:#000000
-    style OCP fill:#E8F5E9,stroke:#2E7D32,color:#000000
-    style HOST fill:#E3F2FD,stroke:#1565C0,color:#000000
-    style VPC fill:#F5F5F5,stroke:#616161,color:#000000
-```
+![Architecture: local/OpenShift to Shared VPC PSC to Vertex](images/vertex-psc-architecture.png)
 
 ## Request path
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'mainBkg': '#BBDEFB', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'actorBkg': '#BBDEFB', 'actorTextColor': '#000000', 'actorBorder': '#0D47A1', 'actorLineColor': '#333333', 'signalColor': '#000000', 'signalTextColor': '#000000', 'labelTextColor': '#000000', 'loopTextColor': '#000000', 'noteBkgColor': '#FFE082', 'noteTextColor': '#000000', 'noteBorderColor': '#F9A825', 'activationBkgColor': '#C8E6C9', 'sequenceNumberColor': '#ffffff'}}}%%
-sequenceDiagram
-    autonumber
-    participant C as Local PC or OpenShift pod
-    participant R as Local DNS resolver
-    participant D as Cloud DNS inbound policy
-    participant Z as Private googleapis.com zone
-    participant N as HA VPN or Interconnect
-    participant P as Shared PSC endpoint
-    participant V as Vertex AI
-    participant M as Gemini or Claude
-
-    C->>R: Resolve aiplatform.googleapis.com
-    R->>D: Forward googleapis.com query
-    D->>Z: Query private zone
-    Z-->>C: 10.10.100.5
-    Note over C,P: Route 10.10.100.5/32 over VPN or Interconnect
-    C->>C: Sign JWT using service-account key
-    C->>N: HTTPS + Authorization Bearer token
-    N->>P: TCP 443 to 10.10.100.5
-    P->>V: Google private backbone
-    V->>V: IAM, model policy, quota checks
-    V->>M: Publisher model request
-    M-->>C: Model response
-```
+![Request path sequence: DNS to PSC to Vertex](images/vertex-psc-request-path.png)
 
 ## What is shared and what stays per project
 
@@ -175,23 +99,7 @@ is layered:
 3. `vertexai.allowedModels` optionally allows only the two approved models.
 4. Claude Model Garden entitlement is required in every calling project.
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'edgeLabelBackground': '#ffffff'}}}%%
-flowchart LR
-    CALLER["Local PC or<br/>OpenShift pod"] --> DNS["DNS API allowlist"]
-    DNS --> PSC["One PSC endpoint"]
-    PSC --> IAM["Vertex IAM"]
-    IAM --> POLICY["allowedModels policy"]
-    POLICY --> OK["Gemini 2.5 Pro<br/>Claude Sonnet 5"]
-    DNS -.->|"unapproved API: NXDOMAIN"| NO["Denied"]
-    POLICY -.->|"unapproved model"| NO
-    classDef good fill:#C8E6C9,stroke:#1B5E20,color:#000000
-    classDef bad fill:#FFCDD2,stroke:#B71C1C,color:#000000
-    classDef node fill:#BBDEFB,stroke:#0D47A1,color:#000000
-    class OK good
-    class NO bad
-    class CALLER,DNS,PSC,IAM,POLICY node
-```
+![Model allowlist enforcement layers](images/vertex-psc-model-policy.png)
 
 Set `enforce_model_allowlist = true` to manage `vertexai.allowedModels`. This is
 a project-wide policy, not only a PSC policy, and requires
@@ -222,24 +130,7 @@ If you later enable private hybrid access:
 
 PSC answers **where** a request goes; a JWT identifies **who** made it.
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': {'darkMode': false, 'background': '#ffffff', 'primaryTextColor': '#000000', 'textColor': '#000000', 'lineColor': '#333333', 'edgeLabelBackground': '#ffffff'}}}%%
-flowchart LR
-    KEY[("Service-account key")]
-    SIGN["Sign RS256 JWT locally"]
-    SELF["Self-signed JWT<br/>no token-server request"]
-    EXCHANGE["OAuth JWT-bearer exchange<br/>optional"]
-    PSC{{"Shared PSC endpoint"}}
-    VERTEX["Vertex AI"]
-    KEY --> SIGN
-    SIGN -->|"TOKEN_MODE=self-signed"| SELF --> PSC
-    SIGN -->|"TOKEN_MODE=oauth"| EXCHANGE --> PSC
-    PSC --> VERTEX
-    classDef node fill:#BBDEFB,stroke:#0D47A1,color:#000000
-    classDef one fill:#FFE082,stroke:#E65100,color:#000000
-    class KEY,SIGN,SELF,EXCHANGE,VERTEX node
-    class PSC one
-```
+![JWT auth modes into Shared PSC endpoint](images/vertex-psc-jwt-auth.png)
 
 Self-signed JWT is the default and avoids a dependency on the OAuth endpoint:
 
