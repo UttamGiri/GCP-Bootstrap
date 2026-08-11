@@ -173,9 +173,11 @@ resource "google_compute_global_address" "psc" {
 
 # load_balancing_scheme must be the empty string; this is a PSC forwarding rule,
 # not a load balancer.
+# PSC Google APIs forwarding-rule names are strict: 1-20 chars, lowercase
+# letters and digits only, must start with a letter (no hyphens).
 resource "google_compute_global_forwarding_rule" "psc" {
   project               = var.host_project_id
-  name                  = "${local.name_prefix}-ep"
+  name                  = "vpsc${var.name_suffix}ep"
   target                = var.psc_target
   network               = google_compute_network.vpc.id
   ip_address            = google_compute_global_address.psc.id
