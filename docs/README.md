@@ -11,6 +11,8 @@
 | [GUIDE-VERTEX.md](GUIDE-VERTEX.md) | Operator guide: what was deployed, public vs PSC access, JWT scripts, OpenShift, outputs, troubleshooting |
 | [TEST-VERTEX.md](TEST-VERTEX.md) | One-page Vertex test runbook: impersonation, curl, scripts, Gemini vs Claude, PSC vs public |
 | [VERTEX-GEMINI-CALL.md](VERTEX-GEMINI-CALL.md) | Working Gemini curl + where DNS maps aiplatform.googleapis.com → PSC 10.10.100.5 |
+| [DESIGN-WORKLOAD-DEV-GKE.md](DESIGN-WORKLOAD-DEV-GKE.md) | Design: workload-dev project, Shared VPC, shared GKE namespace tenancy, CLI/helm access |
+| [AWS-ASSUME-VS-GCP-IMPERSONATE.md](AWS-ASSUME-VS-GCP-IMPERSONATE.md) | AWS AssumeRole vs GCP SA impersonation, with Helm namespace example and diagrams |
 | [GUIDE-GKE-MULTIENV.md](GUIDE-GKE-MULTIENV.md) | Multi-zone GKE on Shared VPC: namespaces for dev/test, RBAC, static IPs, load balancers (PNG diagrams) |
 
 Module-specific READMEs remain next to their Terraform code (`terraform-bootstrap/`, `tfe-workspace/`).

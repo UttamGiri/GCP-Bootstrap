@@ -9,6 +9,10 @@ terraform {
       # so TFE and local runs use the same provider until you upgrade the lock again.
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -60,9 +64,17 @@ module "workload" {
     enable_shared_vpc_host = false
 
     # One global endpoint covers every region, so subnets exist only for DNS
-    # inbound forwarders / future hybrid use. The endpoint IP sits outside them.
+    # inbound forwarders / future hybrid / GKE. Secondary ranges are for
+    # VPC-native GKE pods/services (used when shared_gke.enabled = true).
     subnets = {
-      primary = { region = "us-central1", cidr = "10.10.0.0/24" }
+      primary = {
+        region = "us-central1"
+        cidr   = "10.10.0.0/24"
+        secondary_ranges = {
+          gke-pods     = "10.20.0.0/16"
+          gke-services = "10.30.0.0/20"
+        }
+      }
     }
     psc_endpoint_ip = "10.10.100.5"
 
@@ -107,5 +119,37 @@ module "workload" {
     # lands in TFE state — see the auth section of docs/VERTEX-AI-PSC-ONPREM.md
     # before turning this on.
     create_sa_key = false
+  }
+
+  # ---------------------------------------------------------------------------
+  # workload-dev project + shared GKE (see docs/DESIGN-WORKLOAD-DEV-GKE.md)
+  # Keep enabled=false until you are ready to pay for GKE + create a project.
+  # Flip both to true together after org/billing permissions are in place.
+  # ---------------------------------------------------------------------------
+  workload_dev = {
+    enabled           = false
+    create_project    = true
+    project_id        = "vaflt-workload-dev-1" # must be globally unique
+    project_name      = "workload-dev"
+    org_id            = "327947404107"
+    billing_account   = "01BC6F-241F9A-8762DE"
+    # Requires Shared VPC host enabled (org xpnAdmin). Leave false until then.
+    attach_shared_vpc = false
+    # Add your user so you can impersonate gke-deployer for helm:
+    # impersonators = ["user:you@vaflt.com"]
+    impersonators = []
+  }
+
+  shared_gke = {
+    enabled = false
+    name    = "shared-gke-dev"
+    region  = "us-central1"
+    # false = public control plane so laptop kubectl works without VPN.
+    # true  = private API only (needs VPN or Connect Gateway).
+    enable_private_endpoint = false
+    enable_private_nodes    = true
+    node_count              = 1
+    machine_type            = "e2-medium"
+    namespace               = "workload-dev"
   }
 }

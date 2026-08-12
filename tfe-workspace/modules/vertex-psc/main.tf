@@ -143,6 +143,14 @@ resource "google_compute_subnetwork" "clients" {
   network                  = google_compute_network.vpc.id
   ip_cidr_range            = each.value.cidr
   private_ip_google_access = false
+
+  dynamic "secondary_ip_range" {
+    for_each = each.value.secondary_ranges
+    content {
+      range_name    = secondary_ip_range.key
+      ip_cidr_range = secondary_ip_range.value
+    }
+  }
 }
 
 resource "google_compute_subnetwork_iam_member" "network_user" {

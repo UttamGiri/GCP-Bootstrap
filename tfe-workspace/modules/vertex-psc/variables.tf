@@ -15,10 +15,11 @@ variable "environment" {
 }
 
 variable "subnets" {
-  description = "Shared VPC subnets, keyed by a short name. Terraform creates these. They host Cloud DNS inbound forwarders and the Cloud Router; one global PSC endpoint still serves every region."
+  description = "Shared VPC subnets, keyed by a short name. Terraform creates these. They host Cloud DNS inbound forwarders and the Cloud Router; one global PSC endpoint still serves every region. Optional secondary_ranges are required for VPC-native GKE."
   type = map(object({
     region = string
     cidr   = string
+    secondary_ranges = optional(map(string), {})
   }))
   default = {
     primary = {

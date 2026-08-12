@@ -20,9 +20,12 @@ locals {
     "roles/compute.securityAdmin",
     "roles/dns.admin",
     ],
-    # serviceAccountAdmin does not cover key creation, so only ask for this role
-    # when keys are actually wanted.
-    var.vertex_psc.create_sa_key ? ["roles/iam.serviceAccountKeyAdmin"] : [],
+    try(var.vertex_psc.create_sa_key, false) ? ["roles/iam.serviceAccountKeyAdmin"] : [],
+    try(var.shared_gke.enabled, false) ? ["roles/container.admin"] : [],
+    try(var.workload_dev.enabled, false) && try(var.workload_dev.create_project, true) ? [
+      "roles/resourcemanager.projectCreator",
+      "roles/billing.user",
+    ] : [],
   )
 }
 
@@ -53,6 +56,9 @@ module "workload_resources" {
   environment     = var.environment
 
   vertex_psc = var.vertex_psc
+
+  workload_dev = var.workload_dev
+  shared_gke   = var.shared_gke
 
   depends_on = [module.workspace_identity]
 }

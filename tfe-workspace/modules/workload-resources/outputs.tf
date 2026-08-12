@@ -30,3 +30,19 @@ output "vertex_psc_client_key_json" {
   sensitive = true
   value     = try(module.vertex_psc[0].client_key_json, {})
 }
+
+output "workload_dev" {
+  value = try({
+    project_id                     = module.workload_dev[0].project_id
+    deployer_service_account_email = module.workload_dev[0].deployer_service_account_email
+  }, null)
+}
+
+output "shared_gke" {
+  value = try({
+    cluster_name            = module.shared_gke[0].cluster_name
+    location                = module.shared_gke[0].location
+    namespace               = module.shared_gke[0].namespace
+    get_credentials_command = module.shared_gke[0].get_credentials_command
+  }, null)
+}
