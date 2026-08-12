@@ -4,17 +4,10 @@ terraform {
       source = "hashicorp/google"
     }
     kubernetes = {
-      source = "hashicorp/kubernetes"
+      source                = "hashicorp/kubernetes"
+      configuration_aliases = [kubernetes]
     }
   }
-}
-
-data "google_client_config" "default" {}
-
-provider "kubernetes" {
-  host                   = "https://${google_container_cluster.this.endpoint}"
-  token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(google_container_cluster.this.master_auth[0].cluster_ca_certificate)
 }
 
 locals {

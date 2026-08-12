@@ -38,12 +38,26 @@ locals {
   network_suffix = "1"
 }
 
+data "google_client_config" "default" {}
+
+# Kubernetes provider talks to the shared GKE cluster when it exists.
+# Placeholder host is used while shared_gke is disabled (no k8s resources planned).
+provider "kubernetes" {
+  host                   = try("https://${module.workload.shared_gke.cluster_endpoint}", "https://127.0.0.1")
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = try(base64decode(module.workload.shared_gke.cluster_ca_certificate), "")
+}
+
 provider "google" {
   project = local.project_id
 }
 
 module "workload" {
   source = "../../modules/workload-stack"
+
+  providers = {
+    kubernetes = kubernetes
+  }
 
   project_id      = local.project_id
   workspace_id    = "ws-4V97YqCc8p3GH3U9" # GCP-vaflt-tfe-workspace

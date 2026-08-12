@@ -1,6 +1,15 @@
 # Do not add sibling modules here — add ephemeral resources inside workload-resources/.
 # This depends_on is the only destroy-order guard needed.
 
+terraform {
+  required_providers {
+    kubernetes = {
+      source                = "hashicorp/kubernetes"
+      configuration_aliases = [kubernetes]
+    }
+  }
+}
+
 locals {
   # The compute/dns/serviceusage roles are required by the vertex-psc module. They
   # are granted by the same run that needs them, so the first apply after adding
@@ -49,14 +58,17 @@ module "workspace_identity" {
 module "workload_resources" {
   source = "../workload-resources"
 
+  providers = {
+    kubernetes = kubernetes
+  }
+
   project_id      = var.project_id
   resource_suffix = var.resource_suffix
   bucket_suffix   = var.bucket_suffix
   network_suffix  = var.network_suffix
   environment     = var.environment
 
-  vertex_psc = var.vertex_psc
-
+  vertex_psc   = var.vertex_psc
   workload_dev = var.workload_dev
   shared_gke   = var.shared_gke
 

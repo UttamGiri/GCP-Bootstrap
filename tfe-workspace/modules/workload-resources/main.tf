@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    kubernetes = {
+      source                = "hashicorp/kubernetes"
+      configuration_aliases = [kubernetes]
+    }
+  }
+}
+
 module "storage_buckets" {
   source = "../gcs-buckets"
 
@@ -94,6 +103,10 @@ module "shared_gke" {
   source = "../shared-gke"
 
   count = coalesce(var.shared_gke.enabled, false) && var.vertex_psc.enabled && coalesce(var.workload_dev.enabled, false) ? 1 : 0
+
+  providers = {
+    kubernetes = kubernetes
+  }
 
   project_id = coalesce(var.vertex_psc.host_project_id, var.project_id)
   name       = coalesce(var.shared_gke.name, "shared-gke-dev")
