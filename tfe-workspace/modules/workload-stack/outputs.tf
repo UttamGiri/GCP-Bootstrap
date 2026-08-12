@@ -30,3 +30,13 @@ output "workload_dev" {
 output "shared_gke" {
   value = module.workload_resources.shared_gke
 }
+
+output "shared_gke_cluster_endpoint" {
+  value     = module.workload_resources.shared_gke_cluster_endpoint
+  sensitive = true
+}
+
+output "shared_gke_cluster_ca_certificate" {
+  value     = module.workload_resources.shared_gke_cluster_ca_certificate
+  sensitive = true
+}

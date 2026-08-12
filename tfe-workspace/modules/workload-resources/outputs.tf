@@ -38,11 +38,21 @@ output "workload_dev" {
   }, null)
 }
 
+# Separate from the summary object so the root kubernetes provider can read these
+# without creating a cycle through namespace/RBAC resources.
+output "shared_gke_cluster_endpoint" {
+  value     = try(module.shared_gke[0].cluster_endpoint, null)
+  sensitive = true
+}
+
+output "shared_gke_cluster_ca_certificate" {
+  value     = try(module.shared_gke[0].cluster_ca_certificate, null)
+  sensitive = true
+}
+
 output "shared_gke" {
   value = try({
     cluster_name            = module.shared_gke[0].cluster_name
-    cluster_endpoint        = module.shared_gke[0].cluster_endpoint
-    cluster_ca_certificate  = module.shared_gke[0].cluster_ca_certificate
     location                = module.shared_gke[0].location
     namespace               = module.shared_gke[0].namespace
     get_credentials_command = module.shared_gke[0].get_credentials_command
