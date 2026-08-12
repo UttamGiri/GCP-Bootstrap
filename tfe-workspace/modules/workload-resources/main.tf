@@ -40,9 +40,15 @@ module "vertex_psc" {
   name_suffix     = var.network_suffix
   environment     = var.environment
 
-  subnets = coalesce(var.vertex_psc.subnets, {
-    primary = { region = "us-central1", cidr = "10.10.0.0/24" }
-  })
+  # Do not coalesce(subnets, {primary=...}) — coalesce type-unifies against the
+  # fallback object and drops optional attrs like secondary_ranges (GKE pods/services).
+  subnets = {
+    for k, s in var.vertex_psc.subnets : k => {
+      region           = s.region
+      cidr             = s.cidr
+      secondary_ranges = coalesce(s.secondary_ranges, {})
+    }
+  }
   psc_endpoint_ip = coalesce(var.vertex_psc.psc_endpoint_ip, "10.10.100.5")
   psc_target      = coalesce(var.vertex_psc.psc_target, "all-apis")
 
