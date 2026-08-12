@@ -146,6 +146,96 @@ without a public control-plane endpoint.
 
 ---
 
+## Impersonation in this repo (who can do what)
+
+Users do **not** get GKE roles. Only the deployer SA does. Your user only gets
+permission to **act as that SA**, and only if listed in `impersonators`.
+Not every user can impersonate — the list is explicit.
+
+```text
+you@vaflt.com
+    │  roles/iam.serviceAccountTokenCreator  ← only listed users (Layer 1)
+    ▼
+gke-deployer@vaflt-workload-dev-1.iam.gserviceaccount.com
+    │  roles/container.developer             ← SA → cluster auth (Layer 2)
+    │  Kubernetes RoleBinding                ← SA → namespace only (Layer 3)
+    ▼
+GKE cluster / namespace workload-dev
+```
+
+See also [AWS AssumeRole vs GCP impersonation](AWS-ASSUME-VS-GCP-IMPERSONATE.md).
+
+### Layer 1 — User may impersonate the deployer SA
+
+Only members in `var.impersonators` get Token Creator on the SA. Empty list =
+nobody can impersonate.
+
+```hcl
+# tfe-workspace/modules/workload-project/main.tf
+resource "google_service_account_iam_member" "token_creator" {
+  for_each = toset(var.impersonators)
+
+  service_account_id = google_service_account.deployer.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+}
+```
+
+Set the allowlist in env config (example — replace with your user):
+
+```hcl
+# tfe-workspace/envs/dev/main.tf
+workload_dev = {
+  ...
+  # impersonators = ["user:you@vaflt.com"]
+  impersonators = []
+}
+```
+
+### Layer 2 — Deployer SA may call the GKE API
+
+```hcl
+# tfe-workspace/modules/shared-gke/main.tf
+resource "google_project_iam_member" "deployer_container_developer" {
+  project = var.project_id
+  role    = "roles/container.developer"
+  member  = "serviceAccount:${var.deployer_service_account_email}"
+}
+```
+
+### Layer 3 — Deployer SA is scoped to one namespace (K8s RBAC)
+
+```hcl
+# tfe-workspace/modules/shared-gke/main.tf
+resource "kubernetes_role_binding_v1" "tenant_deployer" {
+  metadata {
+    name      = "${var.namespace}-deployer"
+    namespace = kubernetes_namespace_v1.tenant.metadata[0].name
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Role"
+    name      = kubernetes_role_v1.tenant_edit.metadata[0].name
+  }
+  subject {
+    kind      = "User"
+    name      = var.deployer_service_account_email
+    api_group = "rbac.authorization.k8s.io"
+  }
+}
+```
+
+That binds the SA to the namespace Role (`workload-dev-edit`), not cluster-admin.
+Other namespaces stay invisible / Forbidden.
+
+| Question | Answer in code |
+|---|---|
+| Who may impersonate? | `workload_dev.impersonators` → Token Creator on `gke-deployer` |
+| Who may talk to GKE? | `gke-deployer` → `roles/container.developer` |
+| Who may helm into the ns? | `gke-deployer` → RoleBinding in `workload-dev` only |
+
+---
+
 ## Terraform code (written, off by default)
 
 | Path | Purpose |
@@ -317,9 +407,8 @@ flowchart TB
 
 ## Next step
 
-Code is local (not pushed). When ready:
+Code is on branch `feature/new-bootstrap` (flags still `enabled = false`). When ready:
 
-1. Review `envs/dev/main.tf` flags and set `impersonators`
-2. Ask to **commit/push** and TFE-apply with `enabled = true` when you accept GKE cost
-
-**Not pushed** — local only until you ask.
+1. Set `workload_dev.impersonators` (e.g. `user:you@vaflt.com`)
+2. Set `workload_dev.enabled = true` and `shared_gke.enabled = true`
+3. TFE-apply when you accept GKE cost (~\$25–40 for 5 days with current regional sizing)

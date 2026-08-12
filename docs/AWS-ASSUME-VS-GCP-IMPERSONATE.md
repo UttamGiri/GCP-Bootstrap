@@ -66,6 +66,20 @@ Without this: you have a token/creds but **cannot talk to the cluster API**.
 Without this: you reach the cluster but `helm -n workload-dev` is **Forbidden**,  
 and you still **cannot see** `other-tenant`.
 
+### Where this lives in Terraform (this repo)
+
+| Layer | Resource | File |
+|---|---|---|
+| 1 — Impersonate allowlist | `google_service_account_iam_member.token_creator` on `gke-deployer` (`roles/iam.serviceAccountTokenCreator` for each `impersonators` member) | `tfe-workspace/modules/workload-project/main.tf` |
+| 1 — Allowlist value | `workload_dev.impersonators` (e.g. `["user:you@vaflt.com"]`; `[]` = nobody) | `tfe-workspace/envs/dev/main.tf` |
+| 2 — GKE API | `google_project_iam_member.deployer_container_developer` (`roles/container.developer` on the SA) | `tfe-workspace/modules/shared-gke/main.tf` |
+| 3 — Namespace only | `kubernetes_role_v1.tenant_edit` + `kubernetes_role_binding_v1.tenant_deployer` (subject = deployer SA email) | `tfe-workspace/modules/shared-gke/main.tf` |
+
+Users never get `container.developer` directly. Only listed impersonators can mint
+tokens as the SA; the SA alone has cluster + namespace rights.
+
+Full walkthrough: [Design: workload-dev + shared GKE](DESIGN-WORKLOAD-DEV-GKE.md#impersonation-in-this-repo-who-can-do-what).
+
 ---
 
 ## Sequence: helm into one namespace
