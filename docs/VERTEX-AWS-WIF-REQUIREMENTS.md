@@ -159,4 +159,30 @@ AWS account ID:  ______________
 IAM role name:   ______________
 ```
 
-GCP wires those into `vertex_psc.aws_wif` and, after apply, returns the SA email plus WIF audience / provider for the pod. No secret is exchanged.
+GCP wires those into `vertex_psc.aws_wif`. No secret is exchanged.
+
+---
+
+## What GCP sends to AWS
+
+**Yes — project ID, pool, and provider**, plus the Vertex SA email. No JSON key, no Bearer.
+
+| GCP sends | Value |
+|---|---|
+| Project ID | `bootstrap-prj-501802` |
+| Pool | `aws-kong-vertex` |
+| Provider | `aws-kong` |
+| Vertex SA | `vertex-psc-client-1@bootstrap-prj-501802.iam.gserviceaccount.com` |
+
+Together they form the WIF audience (after apply, use project **number**, from `terraform output -json vertex_aws_wif`):
+
+```text
+//iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/aws-kong-vertex/providers/aws-kong
+```
+
+| Direction | What |
+|---|---|
+| **AWS → GCP** | Account ID + IAM role ARN only |
+| **GCP → AWS** | Project ID + pool + provider + Vertex SA email |
+
+AWS still creates the role + IRSA. The pod mints the Google token itself.
