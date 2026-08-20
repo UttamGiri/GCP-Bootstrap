@@ -22,6 +22,7 @@ output "vertex_psc" {
     cloud_router_region       = module.vertex_psc[0].cloud_router_region
     allowed_api_hosts         = module.vertex_psc[0].allowed_api_hosts
     allowed_models            = module.vertex_psc[0].allowed_models
+    aws_wif                   = module.vertex_psc[0].aws_wif
   }, null)
 }
 

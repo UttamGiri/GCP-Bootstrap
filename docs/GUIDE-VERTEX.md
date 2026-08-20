@@ -132,7 +132,7 @@ policy, use the `gcloud` + `curl` steps above instead of that script.
 | Option | Use for | Needs |
 |---|---|---|
 | **Impersonation** (`print-access-token --impersonate-service-account`) | Laptop testing **now** | Your user + Token Creator on SA |
-| **Workload Identity Federation** | OpenShift / on-prem long term | External IdP → GCP WIF → SA |
+| **Workload Identity Federation** | OpenShift / on-prem / **Kong on AWS (IRSA)** | External IdP → GCP WIF → SA. Design: [VERTEX-KONG-AWS-IRSA-WIF.md](VERTEX-KONG-AWS-IRSA-WIF.md) |
 | JSON SA key + `vertex-sa-token.sh` | Only if org grants an exception | Org policy exception |
 
 `create_sa_key = true` in Terraform will also fail under this org policy — leave
@@ -459,6 +459,7 @@ File: `tfe-workspace/envs/dev/main.tf` → `module.workload.vertex_psc`
 | `psc_endpoint_ip` | `10.10.100.5` | Fixed internal VIP |
 | `enable_hybrid_router` | `false` | No Cloud Router / hybrid cost |
 | `create_sa_key` | `false` | No private key in TFE state |
+| `aws_wif.enabled` | `true` | Trust AWS role `kong-ai-dev-vertex` to impersonate the Vertex SA |
 | `enforce_model_allowlist` | `false` | DNS+IAM only until org policy admin |
 | `enable_shared_vpc_host` | `false` | Manual/org Shared VPC enable if needed |
 | `service_projects` | `{}` | No attached consumers yet |
@@ -469,7 +470,7 @@ Code layout:
 tfe-workspace/envs/dev/main.tf          # wiring + flags
 tfe-workspace/modules/workload-stack/   # stack entry
 tfe-workspace/modules/workload-resources/
-tfe-workspace/modules/vertex-psc/       # VPC, PSC, DNS, SA, optional policy
+tfe-workspace/modules/vertex-psc/       # VPC, PSC, DNS, SA, AWS WIF, optional policy
 tfe-workspace/envs/dev/scripts/         # token + external test helpers
 ```
 

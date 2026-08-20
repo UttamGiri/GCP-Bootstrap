@@ -133,6 +133,15 @@ module "workload" {
     # lands in TFE state — see the auth section of docs/VERTEX-AI-PSC-ONPREM.md
     # before turning this on.
     create_sa_key = false
+
+    # Kong on AWS EKS: GCP trusts IAM role kong-ai-dev-vertex and lets it
+    # impersonate vertex-psc-client-1. AWS still must create that role + IRSA.
+    # See docs/VERTEX-KONG-AWS-IRSA-WIF.md.
+    aws_wif = {
+      enabled        = true
+      aws_account_id = "593024667763"
+      aws_role_name  = "kong-ai-dev-vertex"
+    }
   }
 
   # ---------------------------------------------------------------------------
@@ -141,12 +150,12 @@ module "workload" {
   # Flip both to true together after org/billing permissions are in place.
   # ---------------------------------------------------------------------------
   workload_dev = {
-    enabled           = false
-    create_project    = true
-    project_id        = "vaflt-workload-dev-1" # must be globally unique
-    project_name      = "workload-dev"
-    org_id            = "327947404107"
-    billing_account   = "01BC6F-241F9A-8762DE"
+    enabled         = false
+    create_project  = true
+    project_id      = "vaflt-workload-dev-1" # must be globally unique
+    project_name    = "workload-dev"
+    org_id          = "327947404107"
+    billing_account = "01BC6F-241F9A-8762DE"
     # Requires Shared VPC host enabled (org xpnAdmin). Leave false until then.
     attach_shared_vpc = false
     # Add your user so you can impersonate gke-deployer for helm:

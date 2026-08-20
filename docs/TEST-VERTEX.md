@@ -4,7 +4,8 @@ Everything you need to test Gemini / Claude from your laptop against this
 project. Copy-paste ready.
 
 Related deeper docs: [GUIDE-VERTEX.md](GUIDE-VERTEX.md) ·
-[VERTEX-AI-PSC-ONPREM.md](VERTEX-AI-PSC-ONPREM.md)
+[VERTEX-AI-PSC-ONPREM.md](VERTEX-AI-PSC-ONPREM.md) ·
+[VERTEX-KONG-AWS-IRSA-WIF.md](VERTEX-KONG-AWS-IRSA-WIF.md) (Kong on AWS, not implemented)
 
 ---
 

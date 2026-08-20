@@ -1,11 +1,19 @@
 locals {
   name_prefix = "vertex-psc-${var.name_suffix}"
 
-  host_apis = [
-    "compute.googleapis.com",
-    "dns.googleapis.com",
-    "aiplatform.googleapis.com",
-  ]
+  host_apis = concat(
+    [
+      "compute.googleapis.com",
+      "dns.googleapis.com",
+      "aiplatform.googleapis.com",
+    ],
+    # Token exchange + impersonation for Kong IRSA → this SA (see aws_wif.tf).
+    coalesce(var.aws_wif.enabled, false) ? [
+      "iam.googleapis.com",
+      "iamcredentials.googleapis.com",
+      "sts.googleapis.com",
+    ] : [],
+  )
 
   # API enablement, quota, and billing are per project even though the network
   # path is shared, so every consumer needs these in its own project.

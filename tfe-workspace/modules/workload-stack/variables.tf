@@ -72,6 +72,13 @@ variable "vertex_psc" {
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ])
     enforce_model_allowlist = optional(bool, false)
+    aws_wif = optional(object({
+      enabled        = optional(bool, false)
+      aws_account_id = optional(string, null)
+      aws_role_name  = optional(string, null)
+      pool_id        = optional(string, "aws-kong-vertex")
+      provider_id    = optional(string, "aws-kong")
+    }), {})
   })
   default = {}
 }

@@ -11,6 +11,10 @@
 | [GUIDE-VERTEX.md](GUIDE-VERTEX.md) | Operator guide: what was deployed, public vs PSC access, JWT scripts, OpenShift, outputs, troubleshooting |
 | [TEST-VERTEX.md](TEST-VERTEX.md) | One-page Vertex test runbook: impersonation, curl, scripts, Gemini vs Claude, PSC vs public |
 | [VERTEX-GEMINI-CALL.md](VERTEX-GEMINI-CALL.md) | Working Gemini curl + where DNS maps aiplatform.googleapis.com → PSC 10.10.100.5 |
+| [VERTEX-KONG-AWS-IRSA-WIF.md](VERTEX-KONG-AWS-IRSA-WIF.md) | Kong on AWS EKS: IRSA + GCP WIF impersonates vertex-psc-client-1. GCP WIF is Terraform; AWS/Kong still to build |
+| [VERTEX-AWS-WIF-REQUIREMENTS.md](VERTEX-AWS-WIF-REQUIREMENTS.md) | Handoff: GCP needs only AWS account ID + IAM role name/ARN from AWS |
+| [VERTEX-AWS-WIF-VS-TFE-OIDC.md](VERTEX-AWS-WIF-VS-TFE-OIDC.md) | AWS creates role ARN for GCP (that is all); how this WIF differs from TFE OIDC |
+| [VERTEX-JSON-KEY.md](VERTEX-JSON-KEY.md) | Lab only: Kong mounts sa.json Secret; same /vertex curl, throwaway key |
 | [DESIGN-WORKLOAD-DEV-GKE.md](DESIGN-WORKLOAD-DEV-GKE.md) | Design: workload-dev project, Shared VPC, shared GKE namespace tenancy, CLI/helm access |
 | [AWS-ASSUME-VS-GCP-IMPERSONATE.md](AWS-ASSUME-VS-GCP-IMPERSONATE.md) | AWS AssumeRole vs GCP SA impersonation, with Helm namespace example and diagrams |
 | [GUIDE-GKE-MULTIENV.md](GUIDE-GKE-MULTIENV.md) | Multi-zone GKE on Shared VPC: namespaces for dev/test, RBAC, static IPs, load balancers (PNG diagrams) |

@@ -71,6 +71,7 @@ module "vertex_psc" {
   enable_hybrid_router = coalesce(var.vertex_psc.enable_hybrid_router, false)
   hybrid_source_ranges = coalesce(var.vertex_psc.hybrid_source_ranges, [])
   create_sa_key        = coalesce(var.vertex_psc.create_sa_key, false)
+  aws_wif              = coalesce(var.vertex_psc.aws_wif, {})
 }
 
 module "workload_dev" {

@@ -17,8 +17,8 @@ variable "environment" {
 variable "subnets" {
   description = "Shared VPC subnets, keyed by a short name. Terraform creates these. They host Cloud DNS inbound forwarders and the Cloud Router; one global PSC endpoint still serves every region. Optional secondary_ranges are required for VPC-native GKE."
   type = map(object({
-    region = string
-    cidr   = string
+    region           = string
+    cidr             = string
     secondary_ranges = optional(map(string), {})
   }))
   default = {
@@ -175,5 +175,37 @@ variable "hybrid_source_ranges" {
   description = "CIDRs of local PC / OpenShift networks allowed to reach the PSC endpoint over VPN or Interconnect"
   type        = list(string)
   default     = []
+}
+
+# Trust one AWS IAM role (EKS IRSA) to impersonate host_client. Does not create
+# the AWS role or Helm annotation — those stay in the AWS/Kong stack.
+# See docs/VERTEX-KONG-AWS-IRSA-WIF.md.
+variable "aws_wif" {
+  description = "GCP WIF pool + AWS provider so an EKS IAM role can impersonate the Vertex client SA"
+  type = object({
+    enabled        = optional(bool, false)
+    aws_account_id = optional(string, null)
+    aws_role_name  = optional(string, null)
+    # Stable IDs — WIF pool IDs cannot be reused for ~30 days after delete.
+    pool_id     = optional(string, "aws-kong-vertex")
+    provider_id = optional(string, "aws-kong")
+  })
+  default = {}
+
+  validation {
+    condition = !coalesce(var.aws_wif.enabled, false) || (
+      can(regex("^[0-9]{12}$", coalesce(var.aws_wif.aws_account_id, ""))) &&
+      length(coalesce(var.aws_wif.aws_role_name, "")) > 0
+    )
+    error_message = "When aws_wif.enabled is true, aws_account_id must be 12 digits and aws_role_name must be set."
+  }
+
+  validation {
+    condition = (
+      can(regex("^[a-z][a-z0-9-]{3,31}$", coalesce(var.aws_wif.pool_id, "aws-kong-vertex"))) &&
+      can(regex("^[a-z][a-z0-9-]{3,31}$", coalesce(var.aws_wif.provider_id, "aws-kong")))
+    )
+    error_message = "aws_wif.pool_id and provider_id must be 4–32 chars, start with a letter, and use only lowercase letters, digits, and hyphens."
+  }
 }
 

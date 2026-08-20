@@ -59,22 +59,29 @@ variable "vertex_psc" {
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ])
     enforce_model_allowlist = optional(bool, false)
+    aws_wif = optional(object({
+      enabled        = optional(bool, false)
+      aws_account_id = optional(string, null)
+      aws_role_name  = optional(string, null)
+      pool_id        = optional(string, "aws-kong-vertex")
+      provider_id    = optional(string, "aws-kong")
+    }), {})
   })
 }
 
 # workload-dev GCP project + deployer SA (impersonation target for helm)
 variable "workload_dev" {
   type = object({
-    enabled         = optional(bool, false)
-    create_project  = optional(bool, true)
-    project_id      = optional(string, null)
-    project_name    = optional(string, "workload-dev")
-    org_id          = optional(string, null)
-    folder_id       = optional(string, null)
-    billing_account = optional(string, null)
-    attach_shared_vpc = optional(bool, true)
+    enabled             = optional(bool, false)
+    create_project      = optional(bool, true)
+    project_id          = optional(string, null)
+    project_name        = optional(string, "workload-dev")
+    org_id              = optional(string, null)
+    folder_id           = optional(string, null)
+    billing_account     = optional(string, null)
+    attach_shared_vpc   = optional(bool, true)
     deployer_account_id = optional(string, "gke-deployer")
-    impersonators   = optional(list(string), [])
+    impersonators       = optional(list(string), [])
   })
   default = {}
 }
