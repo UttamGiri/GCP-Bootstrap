@@ -70,3 +70,9 @@ variable "labels" {
   type    = map(string)
   default = {}
 }
+
+variable "extra_project_services" {
+  description = "Additional google_project_service API names for this workload (e.g. discoveryengine.googleapis.com)"
+  type        = list(string)
+  default     = []
+}
