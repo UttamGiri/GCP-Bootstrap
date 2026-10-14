@@ -22,3 +22,25 @@ output "vertex_psc_client_key_json" {
   sensitive = true
   value     = module.workload_resources.vertex_psc_client_key_json
 }
+
+output "gfg" {
+  value = module.workload_resources.gfg
+}
+
+output "workload_dev" {
+  value = module.workload_resources.workload_dev
+}
+
+output "shared_gke" {
+  value = module.workload_resources.shared_gke
+}
+
+output "shared_gke_cluster_endpoint" {
+  value     = module.workload_resources.shared_gke_cluster_endpoint
+  sensitive = true
+}
+
+output "shared_gke_cluster_ca_certificate" {
+  value     = module.workload_resources.shared_gke_cluster_ca_certificate
+  sensitive = true
+}

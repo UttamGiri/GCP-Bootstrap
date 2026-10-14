@@ -103,3 +103,37 @@ output "dns_inbound_forwarder_ips" {
     }
   ]...)
 }
+
+output "aws_wif" {
+  description = "GCP WIF for Kong IRSA. Null when aws_wif.enabled is false. Credential JSON is for GOOGLE_APPLICATION_CREDENTIALS on the Kong pod after the AWS role exists."
+  value = coalesce(var.aws_wif.enabled, false) ? {
+    pool_id               = google_iam_workload_identity_pool.aws_kong[0].workload_identity_pool_id
+    provider_id           = google_iam_workload_identity_pool_provider.aws_kong[0].workload_identity_pool_provider_id
+    provider              = google_iam_workload_identity_pool_provider.aws_kong[0].name
+    audience              = "//iam.googleapis.com/${google_iam_workload_identity_pool_provider.aws_kong[0].name}"
+    aws_role_arn          = local.aws_role_arn
+    principal             = google_service_account_iam_member.aws_kong_wif[0].member
+    service_account_email = google_service_account.host_client.email
+    # ADC file for the Kong/EKS pod (GOOGLE_APPLICATION_CREDENTIALS).
+    # Per project: audience + impersonation SA. Everything under credential_source
+    # is the same for every AWS WIF project (not IPs you get from the AWS team).
+    credential_config = {
+      type                              = "external_account"
+      audience                          = "//iam.googleapis.com/${google_iam_workload_identity_pool_provider.aws_kong[0].name}"
+      subject_token_type                = "urn:ietf:params:aws:token-type:aws4_request" # signed GetCallerIdentity, not a JWT
+      token_url                         = "https://sts.googleapis.com/v1/token"          # Google STS — always this URL
+      service_account_impersonation_url = "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${google_service_account.host_client.email}:generateAccessToken"
+      # AWS IMDS 169.254.169.254 is the fixed metadata IP for every account/project.
+      # EKS IRSA often uses AWS_WEB_IDENTITY_TOKEN_FILE instead of `url`; libraries
+      # with environment_id=aws1 still call GetCallerIdentity (verification URL).
+      credential_source = {
+        environment_id                 = "aws1" # use the AWS credential flow
+        region_url                     = "http://169.254.169.254/latest/meta-data/placement/availability-zone" # which AZ/region
+        url                            = "http://169.254.169.254/latest/meta-data/iam/security-credentials"    # temp AWS access key+secret (EC2)
+        regional_cred_verification_url = "https://sts.{region}.amazonaws.com?Action=GetCallerIdentity&Version=2011-06-15" # AWS STS: who are these keys?
+        imdsv2_session_token_url       = "http://169.254.169.254/latest/api/token" # IMDSv2 gate; required before the two IMDS URLs above
+      }
+    }
+    create_cred_config_command = "gcloud iam workload-identity-pools create-cred-config ${google_iam_workload_identity_pool_provider.aws_kong[0].name} --service-account=${google_service_account.host_client.email} --aws --enable-imdsv2 --output-file=credential-configuration.json"
+  } : null
+}

@@ -33,3 +33,13 @@ output "vertex_psc_client_key_json" {
   sensitive   = true
   value       = module.workload.vertex_psc_client_key_json
 }
+
+output "vertex_aws_wif" {
+  description = "GCP WIF pool/provider for Kong IRSA; null when aws_wif.enabled is false"
+  value       = try(module.workload.vertex_psc.aws_wif, null)
+}
+
+output "gfg" {
+  description = "Gemini for Enterprise workload (gfg); null when disabled"
+  value       = module.workload.gfg
+}

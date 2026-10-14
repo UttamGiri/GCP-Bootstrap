@@ -9,6 +9,10 @@ terraform {
       # so TFE and local runs use the same provider until you upgrade the lock again.
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -34,12 +38,26 @@ locals {
   network_suffix = "1"
 }
 
+data "google_client_config" "default" {}
+
+# Kubernetes provider talks to the shared GKE cluster when it exists.
+# Placeholder host is used while shared_gke is disabled (no k8s resources planned).
+provider "kubernetes" {
+  host                   = try("https://${module.workload.shared_gke_cluster_endpoint}", "https://127.0.0.1")
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = try(base64decode(module.workload.shared_gke_cluster_ca_certificate), "")
+}
+
 provider "google" {
   project = local.project_id
 }
 
 module "workload" {
   source = "../../modules/workload-stack"
+
+  providers = {
+    kubernetes = kubernetes
+  }
 
   project_id      = local.project_id
   workspace_id    = "ws-4V97YqCc8p3GH3U9" # GCP-vaflt-tfe-workspace
@@ -60,9 +78,17 @@ module "workload" {
     enable_shared_vpc_host = false
 
     # One global endpoint covers every region, so subnets exist only for DNS
-    # inbound forwarders / future hybrid use. The endpoint IP sits outside them.
+    # inbound forwarders / future hybrid / GKE. Secondary ranges are for
+    # VPC-native GKE pods/services (used when shared_gke.enabled = true).
     subnets = {
-      primary = { region = "us-central1", cidr = "10.10.0.0/24" }
+      primary = {
+        region = "us-central1"
+        cidr   = "10.10.0.0/24"
+        secondary_ranges = {
+          gke-pods     = "10.20.0.0/16"
+          gke-services = "10.30.0.0/20"
+        }
+      }
     }
     psc_endpoint_ip = "10.10.100.5"
 
@@ -79,9 +105,10 @@ module "workload" {
       "sts.googleapis.com",
     ]
 
-    # The two approved models. Add entries as more are approved.
+    # Approved models. Add entries as more are approved.
     allowed_models = [
       "publishers/google/models/gemini-2.5-pro:predict",
+      "publishers/anthropic/models/claude-sonnet-4-5:predict",
       "publishers/anthropic/models/claude-sonnet-5:predict",
     ]
 
@@ -93,7 +120,12 @@ module "workload" {
     #   app = {
     #     project_id     = "app-prj-123456"
     #   }
-    service_projects = {}
+    service_projects = local.gfg_config.enabled ? {
+      gfg = {
+        project_id       = local.gfg_config.project_id
+        create_client_sa = true
+      }
+    } : {}
 
     # Keep false to avoid hybrid connectivity cost. Cloud Router alone is free,
     # but HA VPN tunnels (~$0.05/hr each) are intentionally not in this stack.
@@ -106,5 +138,28 @@ module "workload" {
     # lands in TFE state — see the auth section of docs/VERTEX-AI-PSC-ONPREM.md
     # before turning this on.
     create_sa_key = false
+
+    # Kong on AWS EKS: enable after AWS IRSA role exists (VERTEX-KONG-AWS-IRSA-WIF.md).
+    aws_wif = {
+      enabled        = false
+      aws_account_id = "593024667763"
+      aws_role_name  = "kong-ai-dev-vertex"
+    }
+  }
+
+  gfg          = local.gfg_config
+  workload_dev = local.workload_dev_config
+
+  shared_gke = {
+    enabled = false
+    name    = "shared-gke-dev"
+    region  = "us-central1"
+    # false = public control plane so laptop kubectl works without VPN.
+    # true  = private API only (needs VPN or Connect Gateway).
+    enable_private_endpoint = false
+    enable_private_nodes    = true
+    node_count              = 1
+    machine_type            = "e2-medium"
+    namespace               = "workload-dev"
   }
 }

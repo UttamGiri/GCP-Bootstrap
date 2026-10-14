@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    kubernetes = {
+      source                = "hashicorp/kubernetes"
+      configuration_aliases = [kubernetes]
+    }
+  }
+}
+
 module "storage_buckets" {
   source = "../gcs-buckets"
 
@@ -31,9 +40,15 @@ module "vertex_psc" {
   name_suffix     = var.network_suffix
   environment     = var.environment
 
-  subnets = coalesce(var.vertex_psc.subnets, {
-    primary = { region = "us-central1", cidr = "10.10.0.0/24" }
-  })
+  # Do not coalesce(subnets, {primary=...}) — coalesce type-unifies against the
+  # fallback object and drops optional attrs like secondary_ranges (GKE pods/services).
+  subnets = {
+    for k, s in var.vertex_psc.subnets : k => {
+      region           = s.region
+      cidr             = s.cidr
+      secondary_ranges = coalesce(s.secondary_ranges, {})
+    }
+  }
   psc_endpoint_ip = coalesce(var.vertex_psc.psc_endpoint_ip, "10.10.100.5")
   psc_target      = coalesce(var.vertex_psc.psc_target, "all-apis")
 
@@ -48,6 +63,7 @@ module "vertex_psc" {
   allow_all_google_apis = coalesce(var.vertex_psc.allow_all_google_apis, false)
   allowed_models = coalesce(var.vertex_psc.allowed_models, [
     "publishers/google/models/gemini-2.5-pro:predict",
+    "publishers/anthropic/models/claude-sonnet-4-5:predict",
     "publishers/anthropic/models/claude-sonnet-5:predict",
   ])
   enforce_model_allowlist = coalesce(var.vertex_psc.enforce_model_allowlist, false)
@@ -55,6 +71,108 @@ module "vertex_psc" {
   enable_hybrid_router = coalesce(var.vertex_psc.enable_hybrid_router, false)
   hybrid_source_ranges = coalesce(var.vertex_psc.hybrid_source_ranges, [])
   create_sa_key        = coalesce(var.vertex_psc.create_sa_key, false)
+  aws_wif              = coalesce(var.vertex_psc.aws_wif, {})
+}
+
+module "gfg" {
+  source = "../../workloads/gfg"
+
+  count = coalesce(var.gfg.enabled, false) ? 1 : 0
+
+  environment     = var.environment
+  create_project  = coalesce(var.gfg.create_project, true)
+  project_id      = var.gfg.project_id
+  project_name    = coalesce(var.gfg.project_name, "gfg")
+  description     = coalesce(var.gfg.description, null)
+  org_id          = try(var.gfg.org_id, null)
+  folder_id       = try(var.gfg.folder_id, null)
+  billing_account = try(var.gfg.billing_account, null)
+
+  host_project_id   = coalesce(var.vertex_psc.host_project_id, var.project_id)
+  attach_shared_vpc = coalesce(var.gfg.attach_shared_vpc, false)
+
+  deployer_account_id   = coalesce(var.gfg.deployer_account_id, "gfg-deployer")
+  gemini_ops_account_id = coalesce(var.gfg.gemini_ops_account_id, "gemini-ops")
+  impersonators         = coalesce(var.gfg.impersonators, [])
+  bucket_suffix         = var.bucket_suffix
+
+  subnet_network_users = var.vertex_psc.enabled ? [
+    for k, s in module.vertex_psc[0].subnets : {
+      region = s.region
+      name   = s.name
+    }
+  ] : []
+
+  depends_on = [module.vertex_psc]
+}
+
+module "workload_dev" {
+  source = "../../workloads/workload-dev"
+
+  count = coalesce(var.workload_dev.enabled, false) ? 1 : 0
+
+  environment     = var.environment
+  create_project  = coalesce(var.workload_dev.create_project, true)
+  project_id      = var.workload_dev.project_id
+  project_name    = coalesce(var.workload_dev.project_name, "workload-dev")
+  description     = try(var.workload_dev.description, null)
+  org_id          = try(var.workload_dev.org_id, null)
+  folder_id       = try(var.workload_dev.folder_id, null)
+  billing_account = try(var.workload_dev.billing_account, null)
+
+  host_project_id   = coalesce(var.vertex_psc.host_project_id, var.project_id)
+  attach_shared_vpc = coalesce(var.workload_dev.attach_shared_vpc, true)
+
+  deployer_account_id = coalesce(var.workload_dev.deployer_account_id, "gke-deployer")
+  impersonators       = coalesce(var.workload_dev.impersonators, [])
+
+  subnet_network_users = var.vertex_psc.enabled ? [
+    for k, s in module.vertex_psc[0].subnets : {
+      region = s.region
+      name   = s.name
+    }
+  ] : []
+
+  depends_on = [module.vertex_psc]
+}
+
+module "shared_gke" {
+  source = "../shared-gke"
+
+  count = coalesce(var.shared_gke.enabled, false) && var.vertex_psc.enabled && coalesce(var.workload_dev.enabled, false) ? 1 : 0
+
+  providers = {
+    kubernetes = kubernetes
+  }
+
+  project_id = coalesce(var.vertex_psc.host_project_id, var.project_id)
+  name       = coalesce(var.shared_gke.name, "shared-gke-dev")
+  region     = coalesce(var.shared_gke.region, "us-central1")
+
+  network    = module.vertex_psc[0].network_self_link
+  subnetwork = module.vertex_psc[0].subnets[coalesce(var.shared_gke.subnet_key, "primary")].self_link
+
+  pods_range_name     = coalesce(var.shared_gke.pods_range_name, "gke-pods")
+  services_range_name = coalesce(var.shared_gke.services_range_name, "gke-services")
+
+  enable_private_nodes    = coalesce(var.shared_gke.enable_private_nodes, true)
+  enable_private_endpoint = coalesce(var.shared_gke.enable_private_endpoint, false)
+  master_ipv4_cidr_block  = coalesce(var.shared_gke.master_ipv4_cidr_block, "172.16.0.0/28")
+
+  node_count   = coalesce(var.shared_gke.node_count, 1)
+  machine_type = coalesce(var.shared_gke.machine_type, "e2-medium")
+  namespace    = coalesce(var.shared_gke.namespace, "workload-dev")
+
+  allow_public_control_plane = coalesce(var.shared_gke.allow_public_control_plane, false)
+  master_authorized_networks = coalesce(var.shared_gke.master_authorized_networks, [])
+
+  deployer_service_account_email = module.workload_dev[0].deployer_service_account_email
+
+  labels = {
+    environment = var.environment
+  }
+
+  depends_on = [module.workload_dev, module.vertex_psc]
 }
 
 # Add buckets, VPC, compute, etc. here — no depends_on on identity needed.

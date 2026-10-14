@@ -53,6 +53,7 @@ Gemini and Claude are publisher models called through
 | Model | Publisher path | Method | Extra requirement |
 |---|---|---|---|
 | Gemini 2.5 Pro | `publishers/google/models/gemini-2.5-pro` | `generateContent` | Vertex AI API enabled |
+| Claude Sonnet 4.5 | `publishers/anthropic/models/claude-sonnet-4-5` | `rawPredict` | Enable in Model Garden per calling project |
 | Claude Sonnet 5 | `publishers/anthropic/models/claude-sonnet-5` | `rawPredict` | Enable in Model Garden per calling project |
 
 Gemini request:
@@ -61,14 +62,14 @@ Gemini request:
 POST https://aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/global/publishers/google/models/gemini-2.5-pro:generateContent
 ```
 
-Claude request:
+Claude Sonnet 4.5 request:
 
 ```bash
-POST https://aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/global/publishers/anthropic/models/claude-sonnet-5:rawPredict
+POST https://aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/global/publishers/anthropic/models/claude-sonnet-4-5:rawPredict
 ```
 
 Claude is a partner model. Open Model Garden with each calling project selected,
-enable Claude Sonnet 5, accept its terms, and request quota if needed.
+enable Claude Sonnet 4.5 (and/or Sonnet 5), accept its terms, and request quota if needed.
 
 ## DNS decides whether traffic uses PSC
 
@@ -204,6 +205,7 @@ vertex_psc = {
 
   allowed_models = [
     "publishers/google/models/gemini-2.5-pro:predict",
+    "publishers/anthropic/models/claude-sonnet-4-5:predict",
     "publishers/anthropic/models/claude-sonnet-5:predict",
   ]
   enforce_model_allowlist = true

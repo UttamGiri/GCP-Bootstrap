@@ -1,6 +1,15 @@
 # Do not add sibling modules here — add ephemeral resources inside workload-resources/.
 # This depends_on is the only destroy-order guard needed.
 
+terraform {
+  required_providers {
+    kubernetes = {
+      source                = "hashicorp/kubernetes"
+      configuration_aliases = [kubernetes]
+    }
+  }
+}
+
 locals {
   # The compute/dns/serviceusage roles are required by the vertex-psc module. They
   # are granted by the same run that needs them, so the first apply after adding
@@ -20,9 +29,16 @@ locals {
     "roles/compute.securityAdmin",
     "roles/dns.admin",
     ],
-    # serviceAccountAdmin does not cover key creation, so only ask for this role
-    # when keys are actually wanted.
-    var.vertex_psc.create_sa_key ? ["roles/iam.serviceAccountKeyAdmin"] : [],
+    try(var.vertex_psc.create_sa_key, false) ? ["roles/iam.serviceAccountKeyAdmin"] : [],
+    try(var.shared_gke.enabled, false) ? ["roles/container.admin"] : [],
+    try(var.workload_dev.enabled, false) && try(var.workload_dev.create_project, true) ? [
+      "roles/resourcemanager.projectCreator",
+      "roles/billing.user",
+    ] : [],
+    try(var.gfg.enabled, false) && try(var.gfg.create_project, true) ? [
+      "roles/resourcemanager.projectCreator",
+      "roles/billing.user",
+    ] : [],
   )
 }
 
@@ -46,13 +62,20 @@ module "workspace_identity" {
 module "workload_resources" {
   source = "../workload-resources"
 
+  providers = {
+    kubernetes = kubernetes
+  }
+
   project_id      = var.project_id
   resource_suffix = var.resource_suffix
   bucket_suffix   = var.bucket_suffix
   network_suffix  = var.network_suffix
   environment     = var.environment
 
-  vertex_psc = var.vertex_psc
+  vertex_psc   = var.vertex_psc
+  gfg          = var.gfg
+  workload_dev = var.workload_dev
+  shared_gke   = var.shared_gke
 
   depends_on = [module.workspace_identity]
 }
