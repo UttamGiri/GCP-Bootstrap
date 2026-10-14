@@ -15,6 +15,10 @@ locals {
     managed_by = "terraform"
     component  = "shared-gke"
   })
+
+  authorized_networks = length(var.master_authorized_networks) > 0 ? var.master_authorized_networks : (
+    var.allow_public_control_plane ? [{ cidr = "0.0.0.0/0", name = "dev-open-public-control-plane" }] : []
+  )
 }
 
 resource "google_project_service" "container" {
@@ -51,12 +55,17 @@ resource "google_container_cluster" "this" {
     master_ipv4_cidr_block  = var.enable_private_nodes ? var.master_ipv4_cidr_block : null
   }
 
-  # Public control plane (enable_private_endpoint=false) lets laptop kubectl
-  # work without VPN. Set true later for private-only API + VPN/Gateway.
-  master_authorized_networks_config {
-    cidr_blocks {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "temp-open-for-dev"
+  # Restrict API server access unless explicitly opened for dev (see allow_public_control_plane).
+  dynamic "master_authorized_networks_config" {
+    for_each = length(local.authorized_networks) > 0 ? [1] : []
+    content {
+      dynamic "cidr_blocks" {
+        for_each = local.authorized_networks
+        content {
+          cidr_block   = cidr_blocks.value.cidr
+          display_name = cidr_blocks.value.name
+        }
+      }
     }
   }
 

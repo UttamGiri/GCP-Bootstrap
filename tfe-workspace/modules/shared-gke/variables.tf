@@ -90,3 +90,18 @@ variable "labels" {
   type    = map(string)
   default = {}
 }
+
+variable "allow_public_control_plane" {
+  description = "If true, authorize 0.0.0.0/0 to the public control plane (dev only). Ignored when master_authorized_networks is non-empty."
+  type        = bool
+  default     = false
+}
+
+variable "master_authorized_networks" {
+  description = "CIDRs allowed to reach the GKE control plane. When empty and allow_public_control_plane is false, no master_authorized_networks block is created."
+  type = list(object({
+    cidr = string
+    name = string
+  }))
+  default = []
+}

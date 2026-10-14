@@ -83,6 +83,25 @@ variable "vertex_psc" {
   default = {}
 }
 
+variable "gfg" {
+  description = "Gemini for Enterprise workload — workloads/gfg/"
+  type = object({
+    enabled               = optional(bool, false)
+    create_project        = optional(bool, true)
+    project_id            = optional(string, null)
+    project_name          = optional(string, "gfg")
+    description           = optional(string, null)
+    org_id                = optional(string, null)
+    folder_id             = optional(string, null)
+    billing_account       = optional(string, null)
+    attach_shared_vpc     = optional(bool, false)
+    deployer_account_id   = optional(string, "gfg-deployer")
+    gemini_ops_account_id = optional(string, "gemini-ops")
+    impersonators         = optional(list(string), [])
+  })
+  default = {}
+}
+
 variable "workload_dev" {
   description = "Create workload-dev GCP project + gke-deployer SA for namespace tenancy"
   type = object({
@@ -114,7 +133,12 @@ variable "shared_gke" {
     master_ipv4_cidr_block  = optional(string, "172.16.0.0/28")
     node_count              = optional(number, 1)
     machine_type            = optional(string, "e2-medium")
-    namespace               = optional(string, "workload-dev")
+    namespace                  = optional(string, "workload-dev")
+    allow_public_control_plane = optional(bool, false)
+    master_authorized_networks = optional(list(object({
+      cidr = string
+      name = string
+    })), [])
   })
   default = {}
 }

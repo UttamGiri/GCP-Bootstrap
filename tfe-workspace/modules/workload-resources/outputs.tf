@@ -32,8 +32,21 @@ output "vertex_psc_client_key_json" {
   value     = try(module.vertex_psc[0].client_key_json, {})
 }
 
+output "gfg" {
+  value = try({
+    workload_id                      = module.gfg[0].workload_id
+    description                      = module.gfg[0].description
+    project_id                       = module.gfg[0].project_id
+    deployer_service_account_email   = module.gfg[0].deployer_service_account_email
+    gemini_ops_service_account_email = module.gfg[0].gemini_ops_service_account_email
+    rag_staging_bucket               = module.gfg[0].rag_staging_bucket
+  }, null)
+}
+
 output "workload_dev" {
   value = try({
+    workload_id                    = module.workload_dev[0].workload_id
+    description                    = module.workload_dev[0].description
     project_id                     = module.workload_dev[0].project_id
     deployer_service_account_email = module.workload_dev[0].deployer_service_account_email
   }, null)

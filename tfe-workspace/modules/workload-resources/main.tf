@@ -74,14 +74,48 @@ module "vertex_psc" {
   aws_wif              = coalesce(var.vertex_psc.aws_wif, {})
 }
 
+module "gfg" {
+  source = "../../workloads/gfg"
+
+  count = coalesce(var.gfg.enabled, false) ? 1 : 0
+
+  environment     = var.environment
+  create_project  = coalesce(var.gfg.create_project, true)
+  project_id      = var.gfg.project_id
+  project_name    = coalesce(var.gfg.project_name, "gfg")
+  description     = coalesce(var.gfg.description, null)
+  org_id          = try(var.gfg.org_id, null)
+  folder_id       = try(var.gfg.folder_id, null)
+  billing_account = try(var.gfg.billing_account, null)
+
+  host_project_id   = coalesce(var.vertex_psc.host_project_id, var.project_id)
+  attach_shared_vpc = coalesce(var.gfg.attach_shared_vpc, false)
+
+  deployer_account_id   = coalesce(var.gfg.deployer_account_id, "gfg-deployer")
+  gemini_ops_account_id = coalesce(var.gfg.gemini_ops_account_id, "gemini-ops")
+  impersonators         = coalesce(var.gfg.impersonators, [])
+  bucket_suffix         = var.bucket_suffix
+
+  subnet_network_users = var.vertex_psc.enabled ? [
+    for k, s in module.vertex_psc[0].subnets : {
+      region = s.region
+      name   = s.name
+    }
+  ] : []
+
+  depends_on = [module.vertex_psc]
+}
+
 module "workload_dev" {
-  source = "../workload-project"
+  source = "../../workloads/workload-dev"
 
   count = coalesce(var.workload_dev.enabled, false) ? 1 : 0
 
+  environment     = var.environment
   create_project  = coalesce(var.workload_dev.create_project, true)
   project_id      = var.workload_dev.project_id
   project_name    = coalesce(var.workload_dev.project_name, "workload-dev")
+  description     = try(var.workload_dev.description, null)
   org_id          = try(var.workload_dev.org_id, null)
   folder_id       = try(var.workload_dev.folder_id, null)
   billing_account = try(var.workload_dev.billing_account, null)
@@ -98,10 +132,6 @@ module "workload_dev" {
       name   = s.name
     }
   ] : []
-
-  labels = {
-    environment = var.environment
-  }
 
   depends_on = [module.vertex_psc]
 }
@@ -132,6 +162,9 @@ module "shared_gke" {
   node_count   = coalesce(var.shared_gke.node_count, 1)
   machine_type = coalesce(var.shared_gke.machine_type, "e2-medium")
   namespace    = coalesce(var.shared_gke.namespace, "workload-dev")
+
+  allow_public_control_plane = coalesce(var.shared_gke.allow_public_control_plane, false)
+  master_authorized_networks = coalesce(var.shared_gke.master_authorized_networks, [])
 
   deployer_service_account_email = module.workload_dev[0].deployer_service_account_email
 

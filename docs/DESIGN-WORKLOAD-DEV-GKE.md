@@ -1,7 +1,11 @@
 # Design: workload-dev project on Shared VPC + shared GKE namespace
 
+> See also: [AWS-EKS-NAMESPACE-HELM-ACCESS.md](AWS-EKS-NAMESPACE-HELM-ACCESS.md) for AWS-side namespace/Helm patterns.
+
 Design + **Terraform code** (disabled by default so GKE does not start billing
 until you flip the flags).
+
+**GKE control plane:** `shared_gke.allow_public_control_plane` defaults to **false**. Set explicit `master_authorized_networks` or enable `allow_public_control_plane` only for lab use.
 
 > **Name correction:** on Google Cloud this is **GKE**, not EKS.
 

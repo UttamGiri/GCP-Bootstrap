@@ -1,8 +1,21 @@
 locals {
-  labels = merge(var.labels, {
+  desc_label = var.description == null ? {} : {
+    workload_desc = substr(lower(replace(replace(var.description, " ", "-"), "/", "-")), 0, 63)
+  }
+
+  labels = merge(var.labels, local.desc_label, {
     managed_by = "terraform"
     component  = "workload-project"
-  })
+  }, var.workload_id == null ? {} : { workload = var.workload_id })
+
+  base_project_services = toset([
+    "compute.googleapis.com",
+    "container.googleapis.com",
+    "iam.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+  ])
+
+  project_services = setunion(local.base_project_services, toset(var.extra_project_services))
 }
 
 resource "google_project" "this" {
@@ -21,12 +34,7 @@ data "google_project" "this" {
 }
 
 resource "google_project_service" "apis" {
-  for_each = toset([
-    "compute.googleapis.com",
-    "container.googleapis.com",
-    "iam.googleapis.com",
-    "cloudresourcemanager.googleapis.com",
-  ])
+  for_each = local.project_services
 
   project            = data.google_project.this.project_id
   service            = each.value

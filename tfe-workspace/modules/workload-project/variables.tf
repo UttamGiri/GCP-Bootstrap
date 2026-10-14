@@ -9,6 +9,16 @@ variable "project_name" {
   default     = "workload-dev"
 }
 
+variable "workload_id" {
+  type    = string
+  default = null
+}
+
+variable "description" {
+  type    = string
+  default = null
+}
+
 variable "org_id" {
   description = "Organization ID when create_project is true and folder_id is unset"
   type        = string

@@ -14,3 +14,11 @@ output "deployer_service_account_email" {
 output "deployer_service_account_name" {
   value = google_service_account.deployer.name
 }
+
+output "workload_id" {
+  value = var.workload_id
+}
+
+output "description" {
+  value = var.description
+}

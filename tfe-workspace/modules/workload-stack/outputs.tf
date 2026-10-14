@@ -23,6 +23,10 @@ output "vertex_psc_client_key_json" {
   value     = module.workload_resources.vertex_psc_client_key_json
 }
 
+output "gfg" {
+  value = module.workload_resources.gfg
+}
+
 output "workload_dev" {
   value = module.workload_resources.workload_dev
 }

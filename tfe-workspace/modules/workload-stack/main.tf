@@ -35,6 +35,10 @@ locals {
       "roles/resourcemanager.projectCreator",
       "roles/billing.user",
     ] : [],
+    try(var.gfg.enabled, false) && try(var.gfg.create_project, true) ? [
+      "roles/resourcemanager.projectCreator",
+      "roles/billing.user",
+    ] : [],
   )
 }
 
@@ -69,6 +73,7 @@ module "workload_resources" {
   environment     = var.environment
 
   vertex_psc   = var.vertex_psc
+  gfg          = var.gfg
   workload_dev = var.workload_dev
   shared_gke   = var.shared_gke
 

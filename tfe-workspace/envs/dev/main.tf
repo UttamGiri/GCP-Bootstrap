@@ -120,7 +120,12 @@ module "workload" {
     #   app = {
     #     project_id     = "app-prj-123456"
     #   }
-    service_projects = {}
+    service_projects = local.gfg_config.enabled ? {
+      gfg = {
+        project_id       = local.gfg_config.project_id
+        create_client_sa = true
+      }
+    } : {}
 
     # Keep false to avoid hybrid connectivity cost. Cloud Router alone is free,
     # but HA VPN tunnels (~$0.05/hr each) are intentionally not in this stack.
@@ -134,34 +139,16 @@ module "workload" {
     # before turning this on.
     create_sa_key = false
 
-    # Kong on AWS EKS: GCP trusts IAM role kong-ai-dev-vertex and lets it
-    # impersonate vertex-psc-client-1. AWS still must create that role + IRSA.
-    # See docs/VERTEX-KONG-AWS-IRSA-WIF.md.
+    # Kong on AWS EKS: enable after AWS IRSA role exists (VERTEX-KONG-AWS-IRSA-WIF.md).
     aws_wif = {
-      enabled        = true
+      enabled        = false
       aws_account_id = "593024667763"
       aws_role_name  = "kong-ai-dev-vertex"
     }
   }
 
-  # ---------------------------------------------------------------------------
-  # workload-dev project + shared GKE (see docs/DESIGN-WORKLOAD-DEV-GKE.md)
-  # Keep enabled=false until you are ready to pay for GKE + create a project.
-  # Flip both to true together after org/billing permissions are in place.
-  # ---------------------------------------------------------------------------
-  workload_dev = {
-    enabled         = false
-    create_project  = true
-    project_id      = "vaflt-workload-dev-1" # must be globally unique
-    project_name    = "workload-dev"
-    org_id          = "327947404107"
-    billing_account = "01BC6F-241F9A-8762DE"
-    # Requires Shared VPC host enabled (org xpnAdmin). Leave false until then.
-    attach_shared_vpc = false
-    # Add your user so you can impersonate gke-deployer for helm:
-    # impersonators = ["user:you@vaflt.com"]
-    impersonators = []
-  }
+  gfg          = local.gfg_config
+  workload_dev = local.workload_dev_config
 
   shared_gke = {
     enabled = false
